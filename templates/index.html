@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Эмуляция прохода</h2>
+<form method="POST" action="/simulate_access">
+    UID карты: <input type="text" name="uid" value="" required><br>
+    Текущая зона: 
+<select name="zone_from">
+      <option value="0">Вход (ранг ≥3)</option>
+      <option value="1">Офис (ранг ≥5)</option>
+       <option value="2">Серверная (ранг ≥8)</option>
+      <option value="999">Выход (ранг ≥3)</option>
+</select><br>
+    Запрашиваемая зона:
+    <select name="zone_to">
+      <option value="0">Вход (ранг ≥3)</option>
+      <option value="1">Офис (ранг ≥5)</option>
+       <option value="2">Серверная (ранг ≥8)</option>
+       <option value="999">Выход (ранг ≥3)</option>
+    </select><br>
+    <button type="submit">Проверить доступ</button>
+</form>
+{% endblock %}

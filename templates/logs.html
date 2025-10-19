@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Журнал проходов (последние 100)</h2>
+<table>
+    <tr>
+        <th>Время</th><th>UID</th><th>Из → В</th><th>Статус</th><th>Причина</th>
+    </tr>
+    {% for log in logs %}
+    <tr style="background: {% if log.success %}#e6ffe6{% else %}#ffe6e6{% endif %}">
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.uid }}</td>
+        <td>{{ log.zone_from }} → {{ log.zone_to }}</td>
+        <td>{% if log.success %}✅{% else %}❌{% endif %}</td>
+        <td>{{ log.reason }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

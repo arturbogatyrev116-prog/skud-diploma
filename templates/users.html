@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Пользователи</h2>
+<form method="POST" action="/add_user">
+    <h3>Добавить пользователя</h3>
+    UID: <input type="text" name="uid" required><br>
+    Ранг: 
+    <select name="rank">
+        <option value="3">3 — Посетитель</option>
+        <option value="4">4 — Персонал</option>
+        <option value="5">5 — Офис</option>
+        <option value="6">6 — Склад</option>
+        <option value="7">7 — Техник</option>
+        <option value="8">8 — Менеджер</option>
+        <option value="9" selected>9 — Админ</option>
+    </select><br>
+    Имя: <input type="text" name="name"><br>
+    <button type="submit">Добавить</button>
+</form>
+<hr>
+<h3>Список пользователей</h3>
+<table>
+    <tr><th>UID</th><th>Ранг</th><th>Ключ (фрагмент)</th></tr>
+    {% for user in users %}
+    <tr>
+        <td>{{ user.uid }}</td>
+        <td>{{ user.rank }}</td>
+        <td>{{ "%.16s..." % user.secret_key.hex() }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}
