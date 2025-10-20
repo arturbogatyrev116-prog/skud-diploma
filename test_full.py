@@ -2,9 +2,10 @@
 import os
 import hmac
 import hashlib
-from database import init_db, add_user, get_user, log_access, get_zones_info
+from database import init_db, add_user, get_user, log_access, get_zones_info, check_block, increment_fail, reset_fail
+import datetime
 from auth_logic import calculate_rank, is_history_valid
-
+import sqlite3
 init_db()
 
 # === Настройка пользователя ===
@@ -35,6 +36,20 @@ if not history_valid:
     print(f"❌ {history_msg}")
     exit()
 
+# === Проверка блокировки ===
+is_blocked, fail_count = check_block(USER_UID)
+if is_blocked:
+    # Рассчитываем оставшееся время
+    conn = sqlite3.connect("skud.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT blocked_until FROM access_blocks WHERE uid = ?", (USER_UID,))
+    blocked_until = datetime.datetime.fromisoformat(cursor.fetchone()[0])
+    conn.close()
+    remaining = (blocked_until - datetime.datetime.now()).total_seconds()
+    if remaining > 0:
+        print(f"❌ Доступ заблокирован на {int(remaining)} секунд из-за 3 неудачных попыток")
+        exit()
+
 required_rank = zones_info[REQUESTED_ZONE]['required_rank']
 print(f"Требуемый ранг для зоны '{REQUESTED_ZONE}': {required_rank}")
 
@@ -63,8 +78,17 @@ for attempt in range(1, MAX_ATTEMPTS + 1):
             log_access(USER_UID, HISTORY[0], REQUESTED_ZONE, False, reason)
             print(f"❌ {reason}")
         exit()
-
+auth_success = False
 # Если цикл завершился без успеха
 reason = f"Не удалось сгенерировать ранг {USER_RANK} за {MAX_ATTEMPTS} попыток"
 log_access(USER_UID, HISTORY[0], REQUESTED_ZONE, False, reason)
 print(f"❌ {reason}")
+if user['rank'] >= required_rank:
+    reset_fail(USER_UID)  # Сбросить счётчик
+    # ... логирование и вывод
+if not auth_success:
+    is_blocked, blocked_time = increment_fail(USER_UID)
+    if is_blocked:
+        print(f"❌ Доступ заблокирован на 1 минуту из-за 3 неудачных попыток")
+    else:
+        print(f"❌ Неудачная попытка ({fail_count + 1}/3)")

@@ -40,7 +40,15 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS access_blocks (
+            uid TEXT PRIMARY KEY,
+            fail_count INTEGER NOT NULL DEFAULT 0,
+            blocked_until DATETIME
+        )
+    ''')
+
     # Базовые зоны (используем INSERT OR IGNORE, чтобы не дублировать)
     zones = [
         (0, 'Вход', 0, 3),
@@ -100,3 +108,60 @@ def get_zones_info():
     }
     conn.close()
     return zones
+import datetime
+
+def check_block(uid: str):
+    """Проверяет, заблокирован ли пользователь."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT fail_count, blocked_until FROM access_blocks WHERE uid = ?", (uid,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return False, 0
+    
+    fail_count, blocked_until = row
+    if blocked_until:
+        blocked_time = datetime.datetime.fromisoformat(blocked_until)
+        if datetime.datetime.now() < blocked_time:
+            return True, fail_count  # Заблокирован
+    
+    return False, fail_count
+
+def increment_fail(uid: str):
+    """Увеличивает счётчик неудач и блокирует при необходимости."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = datetime.datetime.now()
+    blocked_until = now + datetime.timedelta(minutes=1)
+    
+    is_blocked, fail_count = check_block(uid)
+    new_count = fail_count + 1
+    
+    if new_count >= 3:
+        # Блокируем на 1 минуту
+        cursor.execute('''
+            INSERT OR REPLACE INTO access_blocks (uid, fail_count, blocked_until)
+            VALUES (?, ?, ?)
+        ''', (uid, new_count, blocked_until.isoformat()))
+        conn.commit()
+        conn.close()
+        return True, blocked_until
+    else:
+        # Обновляем счётчик
+        cursor.execute('''
+            INSERT OR REPLACE INTO access_blocks (uid, fail_count, blocked_until)
+            VALUES (?, ?, NULL)
+        ''', (uid, new_count))
+        conn.commit()
+        conn.close()
+        return False, None
+
+def reset_fail(uid: str):
+    """Сбрасывает счётчик при успешной аутентификации."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM access_blocks WHERE uid = ?", (uid,))
+    conn.commit()
+    conn.close()

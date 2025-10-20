@@ -1,10 +1,11 @@
 # app.py
 from flask import Flask, render_template, request, redirect, url_for, flash
 import os
-from database import init_db, add_user, get_user, log_access, get_zones_info
+from database import init_db, add_user, get_user, log_access, get_zones_info, check_block, increment_fail, reset_fail
 from auth_logic import calculate_rank, is_history_valid
 import hmac
 import hashlib
+import datetime
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -47,6 +48,17 @@ def simulate_access():
     uid = request.form['uid']
     zone_from = int(request.form['zone_from'])
     zone_to = int(request.form['zone_to'])
+    import sqlite3
+    is_blocked, _ = check_block(uid)
+    if is_blocked:
+        conn = sqlite3.connect("skud.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT blocked_until FROM access_blocks WHERE uid = ?", (uid,))
+        blocked_until = datetime.datetime.fromisoformat(cursor.fetchone()[0])
+        conn.close()
+        remaining = max(0, int((blocked_until - datetime.datetime.now()).total_seconds()))
+        flash(f"❌ Доступ заблокирован на {remaining} секунд из-за 3 неудачных попыток", "error")
+        return redirect(url_for('index'))
     
     user = get_user(uid)
     if not user:
@@ -61,9 +73,9 @@ def simulate_access():
     history = [zone_from, 0] 
     history_valid, history_msg = is_history_valid(history, zones_info)
     if not history_valid:
-      log_access(uid, zone_from, zone_to, False, f"Некорректная история: {history_msg}")
-      flash(f"❌ {history_msg}", "error")
-    return redirect(url_for('index'))
+        log_access(uid, zone_from, zone_to, False, f"Некорректная история: {history_msg}")
+        flash(f"❌ {history_msg}", "error")
+        return redirect(url_for('index'))
 
     if zone_from == 999 and zone_to != 0:
         reason = "Запрещён вход после выхода"
@@ -113,7 +125,21 @@ def simulate_access():
         reason = f"Недостаточно прав: ранг {user['rank']} < {required_rank}"
         log_access(uid, zone_from, zone_to, False, reason)
         flash(f"❌ {reason}", "error")
+        
+    # При успехе:
+    if user['rank'] >= required_rank:
+        reset_fail(uid)
+        # ... flash сообщение
     
+    # При неудаче:
+    else:
+        is_blocked, _ = increment_fail(uid)
+        if is_blocked:
+            flash("❌ Доступ заблокирован на 1 минуту из-за 3 неудачных попыток", "error")
+        else:
+            # Получаем текущий счётчик
+            _, fail_count = check_block(uid)
+            flash(f"❌ Неудачная попытка ({fail_count}/3)", "error")
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
