@@ -3,10 +3,14 @@ cryptography==42.0.0
 flask-wtf>=1.2.0
 
 # NFC зависимости (для Raspberry Pi)
-pn532>=1.0.0
+# Официальная библиотека Adafruit для PN532
+adafruit-circuitpython-pn532>=2.3.0
+# Зависимости Adafruit
+adafruit-circuitpython-busdevice>=5.0.0
+# spidev для SPI связи
 spidev>=3.5
+# RPi.GPIO для работы с GPIO
 RPi.GPIO>=0.7.0; platform_system=="Linux" and platform_machine=="armv7l"
-libgpiod>=2.0; platform_system=="Linux"
 
 # WebSocket для real-time уведомлений (опционально)
 flask-socketio>=5.3.0

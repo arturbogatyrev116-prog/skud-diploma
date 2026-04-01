@@ -1,62 +1,71 @@
 """
 Модуль работы с NFC-считывателем PN532 для Raspberry Pi
-Поддерживает чтение UID карт и запись NTAG 424 DNA
+Использует официальную библиотеку Adafruit CircuitPython PN532
+Поддерживает чтение UID карт и базовые операции NTAG
 """
 import logging
 import hashlib
 import hmac
-import struct
+import time
 from typing import Optional, Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-# Попытка импорта библиотеки для PN532
+# Попытка импорта библиотеки Adafruit
 try:
-    from pn532 import PN532_SPI, PN532
-    PN532_AVAILABLE = True
+    import board
+    import digitalio
+    from adafruit_pn532.i2c import PN532_I2C
+    # Для SPI версии:
+    # from adafruit_pn532.spi import PN532_SPI
+    ADAFRUIT_AVAILABLE = True
 except ImportError:
-    PN532_AVAILABLE = False
-    logger.warning("Библиотека pn532 не найдена. Установите: pip install pn532")
-
-# Константы для NTAG 424 DNA
-NTAG_424_DNA_PAGE = 0xE8  # Страница для записи защищённых данных
-NTAG_AUTH_PAGE = 0xA5     # Страница аутентификации
+    ADAFRUIT_AVAILABLE = False
+    logger.warning("adafruit-circuitpython-pn532 не найдена. Используем режим эмуляции.")
 
 
 class NFCReader:
     """
     Класс для работы с NFC-считывателем PN532
     
-    Подключение через SPI:
-    - VCC -> 3.3V (пин 1)
-    - GND -> GND (пин 6)
-    - MOSI -> GPIO 10 (пин 19)
-    - MISO -> GPIO 9 (пин 21)
-    - SCK -> GPIO 11 (пин 23)
-    - NSS/CS -> GPIO 8 (пин 24)
-    - IRQ -> GPIO 25 (пин 22)
-    - RST -> GPIO 17 (пин 11)
+    Подключение через I2C (рекомендуется Adafruit):
+    - VCC -> 3.3V (Pin 1)
+    - GND -> GND (Pin 6)
+    - SCL -> GPIO 3/SCL (Pin 5)
+    - SDA -> GPIO 2/SDA (Pin 3)
+    - IRQ -> GPIO 24 (Pin 18)
+    - RST -> GPIO 17 (Pin 11)
+    
+    Подключение через SPI (альтернативный вариант):
+    - VCC -> 3.3V (Pin 1)
+    - GND -> GND (Pin 6)
+    - MOSI -> GPIO 10 (Pin 19)
+    - MISO -> GPIO 9 (Pin 21)
+    - SCK -> GPIO 11 (Pin 23)
+    - NSS/CS -> GPIO 8 (Pin 24)
+    - IRQ -> GPIO 25 (Pin 22)
+    - RST -> GPIO 17 (Pin 11)
     """
     
-    def __init__(self, spi_device: int = 0, spi_bus: int = 0, reset_pin: int = 17, irq_pin: int = 25):
+    def __init__(self, use_spi: bool = False, spi_device=0, reset_pin: int = 17, irq_pin: int = 24):
         """
         Инициализация NFC-ридера
         
         Args:
+            use_spi: Если True, использовать SPI (по умолчанию I2C)
             spi_device: SPI устройство (0 для /dev/spidev0.0)
-            spi_bus: SPI шина (0 для Raspberry Pi)
             reset_pin: GPIO пин для сброса (BCM нумерация)
             irq_pin: GPIO пин для прерываний (BCM нумерация)
         """
+        self.use_spi = use_spi
         self.spi_device = spi_device
-        self.spi_bus = spi_bus
         self.reset_pin = reset_pin
         self.irq_pin = irq_pin
-        self.reader: Optional[PN532_SPI] = None
+        self.pn532 = None
         self.initialized = False
         
-        if not PN532_AVAILABLE:
-            logger.error("Библиотека pn532 недоступна. Используем режим эмуляции.")
+        if not ADAFRUIT_AVAILABLE:
+            logger.info("NFCReader: режим эмуляции (без железа)")
         
     def init(self) -> bool:
         """
@@ -65,38 +74,58 @@ class NFCReader:
         Returns:
             True если успешно, False иначе
         """
-        if not PN532_AVAILABLE:
+        if not ADAFRUIT_AVAILABLE:
             # Режим эмуляции для тестирования без железа
-            logger.info("PN532: эмуляция инициализации (режим без железа)")
             self.initialized = True
             return True
-            
+        
         try:
-            import spidev
-            import RPi.GPIO as GPIO
-            
-            # Настройка SPI
-            spi = spidev.SpiDev()
-            spi.open(self.spi_bus, self.spi_device)
-            spi.max_speed_hz = 500000  # 500 kHz
-            
-            # Настройка GPIO
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.reset_pin, GPIO.OUT)
-            GPIO.setup(self.irq_pin, GPIO.IN)
-            
-            # Создание объекта PN532
-            self.reader = PN532_SPI(spi, self.reset_pin, self.irq_pin)
+            if self.use_spi:
+                # Инициализация через SPI
+                import board
+                import digitalio
+                from adafruit_pn532.spi import PN532_SPI
+                import spidev
+                
+                # SPI CS пин
+                cs = digitalio.DigitalInOut(board.D8)  # GPIO 8 (CE0)
+                cs.direction = digitalio.Direction.OUTPUT
+                
+                # SPI объект
+                spi = spidev.SpiDev()
+                spi.open(0, self.spi_device)
+                spi.max_speed_hz = 500000  # 500 kHz
+                
+                # Reset пин
+                rst = digitalio.DigitalInOut(board.D17)  # GPIO 17
+                
+                self.pn532 = PN532_SPI(spi, cs, rst, debug=False)
+                
+            else:
+                # Инициализация через I2C (по умолчанию)
+                import board
+                import digitalio
+                
+                # IRQ и RST пины
+                irq = digitalio.DigitalInOut(board.D24)  # GPIO 24
+                irq.direction = digitalio.Direction.INPUT
+                
+                rst = digitalio.DigitalInOut(board.D17)  # GPIO 17
+                
+                # I2C объект
+                i2c = board.I2C()
+                
+                self.pn532 = PN532_I2C(i2c, debug=False, irq=irq, reset=rst)
             
             # Проверка связи
-            version = self.reader.get_version()
-            logger.info(f"PN532 версия: {version}")
+            version = self.pn532.ic_version
+            logger.info(f"PN532 найден: {version}")
             
-            # Настройка антенны
-            self.reader.set_passive_activation_mode(True)
+            # Настройка SAM
+            self.pn532.sam_configuration()
+            logger.info("PN532 SAM настроен")
             
             self.initialized = True
-            logger.info("PN532 успешно инициализирован")
             return True
             
         except Exception as e:
@@ -118,14 +147,14 @@ class NFCReader:
             if not self.init():
                 return None
         
-        if not PN532_AVAILABLE:
+        if not ADAFRUIT_AVAILABLE:
             # Эмуляция для тестирования
-            logger.debug("PN532: эмуляция чтения UID")
+            logger.debug("NFCReader: эмуляция чтения UID")
             return None
         
         try:
-            # Чтение карты в режиме MiFare Classic
-            uid = self.reader.read_passive_target(timeout)
+            # Чтение карты с таймаутом
+            uid = self.pn532.read_passive_target(timeout=timeout/1000)
             
             if uid:
                 uid_hex = uid.hex().upper()
@@ -135,7 +164,7 @@ class NFCReader:
             return None
             
         except Exception as e:
-            logger.error(f"Ошибка чтения UID: {e}")
+            logger.debug(f"Карта не найдена (таймаут): {e}")
             return None
     
     def read_ntag_data(self, page: int = 4, count: int = 4) -> Optional[bytes]:
@@ -149,15 +178,12 @@ class NFCReader:
         Returns:
             Прочитанные данные или None
         """
-        if not self.initialized:
-            return None
-            
-        if not PN532_AVAILABLE:
+        if not self.initialized or not ADAFRUIT_AVAILABLE:
             return None
         
         try:
-            # Аутентификация не требуется для публичных страниц NTAG
-            data = self.reader.mifare_classic_read(page)
+            # NTAG использует Mifare Classic команды для чтения
+            data = self.pn532.mifare_classic_read(page)
             logger.debug(f"NTAG данные со страницы {page}: {data.hex()}")
             return data
             
@@ -184,10 +210,7 @@ class NFCReader:
         Returns:
             True если успешно, False иначе
         """
-        if not self.initialized:
-            return False
-            
-        if not PN532_AVAILABLE:
+        if not self.initialized or not ADAFRUIT_AVAILABLE:
             return False
         
         if len(data) > 16:
@@ -198,17 +221,15 @@ class NFCReader:
             # Аутентификация если предоставлены ключи
             if key_a:
                 # Аутентификация с ключом A
-                pass  # Реализация зависит от типа карты
+                pass
             
-            # Запись данных
-            # Для NTAG запись поблочная (4 байта за раз)
+            # Запись данных поблочно (4 байта за раз)
             for i in range(0, len(data), 4):
                 block_data = data[i:i+4]
-                # Дополняем до 4 байт если нужно
                 if len(block_data) < 4:
                     block_data = block_data + b'\x00' * (4 - len(block_data))
                 
-                self.reader.mifare_classic_write(page + i // 4, block_data)
+                self.pn532.mifare_classic_write(page + i // 4, block_data)
             
             logger.info(f"NTAG: записано {len(data)} байт на страницу {page}")
             return True
@@ -226,8 +247,6 @@ class NFCReader:
         """
         Записать защищённые данные на NTAG 424 DNA
         
-        Использует HMAC-SHA256 для создания защитного токена.
-        
         Args:
             uid: UID пользователя
             secret_key: Секретный ключ пользователя
@@ -242,14 +261,11 @@ class NFCReader:
         history_bytes = json.dumps(history).encode()
         token = hmac.new(secret_key, history_bytes, hashlib.sha256).digest()
         
-        # Формируем данные для записи:
-        # [4 байта UID hash][16 байт HMAC][4 байта timestamp]
+        # Формируем данные для записи
         uid_hash = hashlib.md5(uid.encode()).digest()[:4]
-        timestamp = struct.pack('>I', int(hashlib.sha256(history_bytes).digest()[:4], 16) & 0xFFFFFFFF)
+        data_to_write = uid_hash + token[:12]  # 16 байт
         
-        data_to_write = uid_hash + token[:12]  # 16 байт всего
-        
-        if self.write_ntag_data(NTAG_424_DNA_PAGE, data_to_write):
+        if self.write_ntag_data(0xE8, data_to_write):  # Страница NTAG 424 DNA
             logger.info(f"NTAG 424 DNA: записаны защищённые данные для {uid}")
             return True, "Данные записаны"
         else:
@@ -262,11 +278,11 @@ class NFCReader:
         Returns:
             (data_dict, message)
         """
-        if not PN532_AVAILABLE:
-            return None, "PN532 недоступен"
+        if not ADAFRUIT_AVAILABLE:
+            return None, "Adafruit библиотека недоступна"
         
         try:
-            data = self.read_ntag_data(NTAG_424_DNA_PAGE, 4)
+            data = self.read_ntag_data(page=0xE8, count=4)
             
             if not data or len(data) < 16:
                 return None, "Недостаточно данных"
@@ -294,8 +310,6 @@ class NFCReader:
         Returns:
             UID карты или None
         """
-        import time
-        
         start_time = time.time()
         
         while True:
@@ -315,12 +329,12 @@ class NFCReader:
     
     def close(self):
         """Закрыть соединение с PN532"""
-        if not PN532_AVAILABLE:
+        if not ADAFRUIT_AVAILABLE:
             return
             
         try:
-            import RPi.GPIO as GPIO
-            GPIO.cleanup()
+            # Освобождение ресурсов
+            self.initialized = False
             logger.info("PN532: соединение закрыто")
         except Exception as e:
             logger.error(f"Ошибка закрытия: {e}")
@@ -337,7 +351,7 @@ class NFCReader:
 def test_nfc():
     """Тест NFC-ридера"""
     print("=" * 50)
-    print("Тест NFC-ридера PN532")
+    print("Тест NFC-ридера PN532 (Adafruit)")
     print("=" * 50)
     
     reader = NFCReader()
