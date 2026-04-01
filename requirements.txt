@@ -1,0 +1,12 @@
+flask>=2.3.0
+cryptography>=41.0.0
+flask-wtf>=1.2.0
+
+# NFC зависимости (для Raspberry Pi)
+pn532>=1.0.0
+spidev>=3.5
+RPi.GPIO>=0.7.0; platform_system=="Linux" and platform_machine=="armv7l"
+libgpiod>=2.0; platform_system=="Linux"
+
+# WebSocket для real-time уведомлений (опционально)
+flask-socketio>=5.3.0

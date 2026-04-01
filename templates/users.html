@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Пользователи</h2>
+
 <form method="POST" action="/add_user">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h3>Добавить пользователя</h3>
-    UID: <input type="text" name="uid" required><br>
-    Ранг: 
+    UID: <input type="text" name="uid" required placeholder="Например: ADMIN_01"><br>
+    Ранг:
     <select name="rank">
         <option value="3">3 — Посетитель</option>
         <option value="4">4 — Персонал</option>
@@ -14,18 +16,47 @@
         <option value="8">8 — Менеджер</option>
         <option value="9" selected>9 — Админ</option>
     </select><br>
-    Имя: <input type="text" name="name"><br>
+    Имя: <input type="text" name="name" placeholder="Имя для отображения"><br>
     <button type="submit">Добавить</button>
 </form>
 <hr>
 <h3>Список пользователей</h3>
 <table>
-    <tr><th>UID</th><th>Ранг</th><th>Ключ (фрагмент)</th></tr>
+    <tr>
+        <th>UID</th>
+        <th>Ранг</th>
+        <th>Текущая зона</th>
+        <th>Дата создания</th>
+        <th>Действия</th>
+    </tr>
     {% for user in users %}
     <tr>
-        <td>{{ user.uid }}</td>
-        <td>{{ user.rank }}</td>
-        <td>{{ "%.16s..." % user.secret_key.hex() }}</td>
+        <td><strong>{{ user.uid }}</strong></td>
+        <td>
+            <span style="padding: 3px 8px; border-radius: 4px; background: {% if user.rank >= 8 %}#d32f2f{% elif user.rank >= 6 %}#f57c00{% elif user.rank >= 4 %}#1976d2{% else %}#388e3c{% endif %}; color: white;">
+                {{ user.rank }}
+            </span>
+        </td>
+        <td>{{ user.current_zone }}</td>
+        <td>{{ user.created_at if user.created_at else 'N/A' }}</td>
+        <td>
+            <a href="/edit_user/{{ user.uid }}" 
+               style="display: inline-block; padding: 5px 10px; background: #2196f3; color: white; text-decoration: none; border-radius: 4px; margin-right: 5px;">
+                ✏️ Редактировать
+            </a>
+            <form method="POST" action="/delete_user/{{ user.uid }}" style="display: inline;" 
+                  onsubmit="return confirm('Вы уверены, что хотите удалить пользователя {{ user.uid }}?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" 
+                        style="padding: 5px 10px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🗑️ Удалить
+                </button>
+            </form>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="5" style="text-align: center; color: #666;">Пользователи не найдены</td>
     </tr>
     {% endfor %}
 </table>

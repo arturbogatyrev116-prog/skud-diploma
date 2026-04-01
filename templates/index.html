@@ -1,25 +1,293 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Эмуляция прохода</h2>
-<form method="POST" action="/simulate_access">
-    UID карты: <input type="text" name="uid" value="" required><br>
-    Запрашиваемая зона:
-    <select name="zone_to">
+<h2>🚪 Эмуляция прохода</h2>
+
+<!-- NFC Панель -->
+<div id="nfc-panel" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin: 0; color: white;">📡 NFC Считыватель</h3>
+        <span id="nfc-status" style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 12px; color: white;">
+            Проверка...
+        </span>
+    </div>
+    
+    <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px;">
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+                <label style="color: rgba(255,255,255,0.9); font-size: 14px; display: block; margin-bottom: 5px;">
+                    Зона доступа:
+                </label>
+                <select id="nfc-zone" style="padding: 8px 12px; border-radius: 6px; border: none; font-size: 14px; width: 100%; max-width: 250px;">
+                    <option value="0">Вход (ранг ≥3)</option>
+                    <option value="1" selected>Офис (ранг ≥5)</option>
+                    <option value="2">Серверная (ранг ≥8)</option>
+                    <option value="999">Выход (ранг ≥3)</option>
+                </select>
+            </div>
+            
+            <button id="nfc-poll-btn" onclick="pollNFC()" 
+                    style="background: #4caf50; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.3s; box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);">
+                📇 Приложить карту
+            </button>
+            
+            <button id="nfc-auto-poll-btn" onclick="toggleAutoPoll()" 
+                    style="background: #2196f3; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.3s;">
+                🔄 Авто-режим
+            </button>
+        </div>
+        
+        <div id="nfc-result" style="margin-top: 15px; padding: 12px; border-radius: 6px; display: none;"></div>
+    </div>
+    
+    <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.7); font-size: 13px;">
+        💡 Приложите NFC-карту к считывателю PN532 для проверки доступа
+    </p>
+</div>
+
+<!-- Форма ручной эмуляции -->
+<form method="POST" action="/simulate_access" style="background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;">
+    <h3 style="margin-top: 0; color: #333;">📝 Ручной ввод UID</h3>
+    
+    <label>UID карты:</label><br>
+    <select name="uid" id="uid-select" onchange="document.querySelector('input[name=\'uid\'][type=\'text\']').value = this.value" 
+            style="padding: 8px; border-radius: 4px; border: 1px solid #ddd; width: 100%; max-width: 400px;">
+        <option value="">-- Выберите пользователя --</option>
+        {% for user in users %}
+        <option value="{{ user.uid }}">
+            {{ user.uid }} (ранг {{ user.rank }}) {% if user.zone_name %}— {{ user.zone_name }}{% endif %}
+        </option>
+        {% endfor %}
+    </select>
+    <br>
+    <small style="color: #666;">или введите вручную:</small>
+    <input type="text" name="uid" value="" placeholder="Например: ADMIN_01" 
+           style="margin-top: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ddd; width: 100%; max-width: 400px;"><br>
+
+    <label style="margin-top: 15px; display: block;">Запрашиваемая зона:</label>
+    <select name="zone_to" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
         <option value="0">Вход (ранг ≥3)</option>
         <option value="1">Офис (ранг ≥5)</option>
         <option value="2">Серверная (ранг ≥8)</option>
         <option value="999">Выход (ранг ≥3)</option>
     </select><br>
-    <button type="submit">Проверить доступ</button>
+
+    <button type="submit" style="margin-top: 15px; padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+        🔓 Проверить доступ
+    </button>
 </form>
-{% if get_flashed_messages() %}
-<div style="margin-top: 20px; padding: 10px; background: #e6f4ea; border: 1px solid #34a853;">
-    <strong>Дверь открыта!</strong><br>
-    <!-- Динамическая ссылка с реальным UID -->
-    <a href="/confirm_pass/{{ session.current_uid }}"
-       style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #34a853; color: white; text-decoration: none; border-radius: 4px;">
-        Подтвердить проход для {{ session.current_uid }}
-    </a>
+
+<!-- Сообщения -->
+{% set messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}
+    {% if category == 'success' and session.current_uid %}
+    <div style="margin-top: 20px; padding: 15px; background: #e6f4ea; border: 2px solid #34a853; border-radius: 8px;">
+        <strong style="font-size: 16px;">✅ Дверь открыта!</strong><br>
+        <span style="margin-top: 10px; display: block;">{{ message }}</span>
+        <a href="/confirm_pass/{{ session.current_uid }}"
+           style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #34a853; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            ✓ Подтвердить проход для {{ session.current_uid }}
+        </a>
+    </div>
+    {% elif category == 'error' %}
+    <div style="margin-top: 20px; padding: 15px; background: #ffebee; border: 2px solid #f44336; border-radius: 8px;">
+        <strong style="font-size: 16px;">❌ Отказано в доступе</strong><br>
+        <span style="margin-top: 10px; display: block;">{{ message }}</span>
+    </div>
+    {% elif category == 'success' %}
+    <div style="margin-top: 20px; padding: 15px; background: #e6f4ea; border: 2px solid #34a853; border-radius: 8px;">
+        {{ message }}
+    </div>
+    {% endif %}
+{% endfor %}
+
+<hr style="margin: 30px 0;">
+
+<h3>📊 Статус системы</h3>
+<div id="status-panel" style="padding: 15px; background: #f5f5f5; border-radius: 8px;">
+    <p>Загрузка статуса...</p>
 </div>
-{% endif %}
+
+<script>
+// NFC функции
+let nfcAvailable = false;
+let autoPollInterval = null;
+let isAutoPolling = false;
+
+// Проверка доступности NFC
+function checkNFCStatus() {
+    fetch('/api/nfc/status')
+        .then(response => response.json())
+        .then(data => {
+            const statusEl = document.getElementById('nfc-status');
+            if (data.available && data.initialized) {
+                statusEl.innerHTML = '✅ Подключен';
+                statusEl.style.background = 'rgba(76, 175, 80, 0.3)';
+                nfcAvailable = true;
+            } else if (data.available) {
+                statusEl.innerHTML = '⚠️ Инициализация...';
+                statusEl.style.background = 'rgba(255, 152, 0, 0.3)';
+                nfcAvailable = true;
+            } else {
+                statusEl.innerHTML = '❌ Не доступен';
+                statusEl.style.background = 'rgba(244, 67, 54, 0.3)';
+                nfcAvailable = false;
+            }
+        })
+        .catch(err => {
+            const statusEl = document.getElementById('nfc-status');
+            statusEl.innerHTML = '❌ Ошибка';
+            statusEl.style.background = 'rgba(244, 67, 54, 0.3)';
+            nfcAvailable = false;
+        });
+}
+
+// Опрос NFC
+function pollNFC() {
+    const btn = document.getElementById('nfc-poll-btn');
+    const resultEl = document.getElementById('nfc-result');
+    const zoneTo = document.getElementById('nfc-zone').value;
+    
+    if (!nfcAvailable) {
+        resultEl.style.display = 'block';
+        resultEl.style.background = '#fff3e0';
+        resultEl.style.color = '#e65100';
+        resultEl.innerHTML = '⚠️ NFC-ридер недоступен. Убедитесь, что PN532 подключен к Raspberry Pi.';
+        return;
+    }
+    
+    // Анимация кнопки
+    btn.disabled = true;
+    btn.innerHTML = '📡 Сканирование...';
+    btn.style.background = '#9e9e9e';
+    
+    resultEl.style.display = 'none';
+    
+    fetch('/api/nfc/poll', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({zone_to: parseInt(zoneTo)})
+    })
+    .then(response => response.json())
+    .then(data => {
+        resultEl.style.display = 'block';
+        
+        if (data.error) {
+            resultEl.style.background = '#ffebee';
+            resultEl.style.color = '#c62828';
+            resultEl.innerHTML = '❌ ' + data.error;
+        } else if (data.action === 'no_card') {
+            resultEl.style.background = '#fff3e0';
+            resultEl.style.color = '#e65100';
+            resultEl.innerHTML = '📇 Карта не обнаружена. Приложите карту к считывателю.';
+        } else if (data.action === 'granted') {
+            resultEl.style.background = '#e8f5e9';
+            resultEl.style.color = '#2e7d32';
+            resultEl.innerHTML = `
+                <strong>✅ ${data.message}</strong><br>
+                <small>UID: ${data.uid} | ${data.zone_from} → ${data.zone_name}</small>
+            `;
+            // Автоматическое обновление статуса системы
+            setTimeout(loadStatus, 500);
+        } else if (data.action === 'blocked') {
+            resultEl.style.background = '#ffebee';
+            resultEl.style.color = '#c62828';
+            resultEl.innerHTML = `🔒 <strong>${data.message}</strong>`;
+        } else if (data.action === 'unknown') {
+            resultEl.style.background = '#fff3e0';
+            resultEl.style.color = '#e65100';
+            resultEl.innerHTML = `❓ <strong>Неизвестная карта</strong><br><small>UID: ${data.uid}<br>Зарегистрируйте пользователя через веб-интерфейс или используйте personalize.py</small>`;
+        } else if (data.action === 'denied') {
+            resultEl.style.background = '#ffebee';
+            resultEl.style.color = '#c62828';
+            resultEl.innerHTML = `❌ <strong>Отказано</strong><br>${data.message}`;
+        }
+    })
+    .catch(err => {
+        resultEl.style.display = 'block';
+        resultEl.style.background = '#ffebee';
+        resultEl.style.color = '#c62828';
+        resultEl.innerHTML = '❌ Ошибка соединения: ' + err;
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '📇 Приложить карту';
+        btn.style.background = '#4caf50';
+    });
+}
+
+// Авто-режим
+function toggleAutoPoll() {
+    const btn = document.getElementById('nfc-auto-poll-btn');
+    
+    if (isAutoPolling) {
+        // Остановить
+        clearInterval(autoPollInterval);
+        isAutoPolling = false;
+        btn.innerHTML = '🔄 Авто-режим';
+        btn.style.background = '#2196f3';
+    } else {
+        // Запустить
+        if (!nfcAvailable) {
+            alert('NFC-ридер недоступен!');
+            return;
+        }
+        isAutoPolling = true;
+        btn.innerHTML = '⏹️ Стоп';
+        btn.style.background = '#f44336';
+        
+        // Первый опрос сразу
+        pollNFC();
+        
+        // Затем каждые 2 секунды
+        autoPollInterval = setInterval(pollNFC, 2000);
+    }
+}
+
+// Загрузка статуса системы
+function loadStatus() {
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            let html = '<table style="width: 100%;">';
+            html += '<tr><th>Зона</th><th>Пользователей</th><th>Список</th></tr>';
+
+            for (const [zoneId, users] of Object.entries(data.users_by_zone)) {
+                if (users.length > 0) {
+                    const zoneNames = {
+                        '0': 'Вход',
+                        '1': 'Офис',
+                        '2': 'Серверная',
+                        '999': 'Выход'
+                    };
+                    const zoneName = zoneNames[zoneId] || 'Зона ' + zoneId;
+                    const userNames = users.map(u => u.uid + ' (р.' + u.rank + ')').join(', ');
+                    html += '<tr>';
+                    html += '<td><strong>' + zoneName + '</strong></td>';
+                    html += '<td>' + users.length + '</td>';
+                    html += '<td>' + userNames + '</td>';
+                    html += '</tr>';
+                }
+            }
+
+            if (html === '<table style="width: 100%;"><tr><th>Зона</th><th>Пользователей</th><th>Список</th></tr>') {
+                html += '<tr><td colspan="3" style="text-align: center; color: #666;">Нет пользователей в зонах</td></tr>';
+            }
+
+            html += '</table>';
+            html += '<p style="margin-top: 10px; color: #666;">Всего пользователей: <strong>' + data.total_users + '</strong></p>';
+            document.getElementById('status-panel').innerHTML = html;
+        })
+        .catch(err => {
+            document.getElementById('status-panel').innerHTML = '<p style="color: red;">Ошибка загрузки статуса</p>';
+            console.error(err);
+        });
+}
+
+// Инициализация при загрузке
+checkNFCStatus();
+setInterval(checkNFCStatus, 10000); // Проверка NFC каждые 10 секунд
+loadStatus();
+setInterval(loadStatus, 5000);
+</script>
+
 {% endblock %}
