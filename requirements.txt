@@ -1,5 +1,5 @@
 flask>=2.3.0
-cryptography>=41.0.0
+cryptography==42.0.0
 flask-wtf>=1.2.0
 
 # NFC зависимости (для Raspberry Pi)

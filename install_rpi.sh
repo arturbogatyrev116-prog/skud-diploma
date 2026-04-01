@@ -44,9 +44,15 @@ apt-get install -y \
     python3-dev \
     libffi-dev \
     libssl-dev \
+    pkg-config \
+    cmake \
+    build-essential \
     git \
     spi-tools \
-    i2c-tools
+    i2c-tools \
+    librust-openssl-dev \
+    rustc \
+    cargo
 
 # Включение SPI интерфейса
 log_info "Включение SPI интерфейса..."
