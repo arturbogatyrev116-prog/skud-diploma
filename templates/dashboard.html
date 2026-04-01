@@ -103,20 +103,20 @@
                 
                 <!-- Зона 7 - Серверная -->
                 <g class="zone-group" data-zone="7">
-                    <rect x="680" y="320" width="200" height="160" rx="8" 
+                    <rect x="750" y="150" width="180" height="130" rx="8"
                           fill="url(#zoneGrad)" stroke="#f44336" stroke-width="3"/>
-                    <text x="780" y="390" text-anchor="middle" font-size="14" font-weight="bold" fill="#c62828">СЕРВЕРНАЯ</text>
-                    <text x="780" y="415" text-anchor="middle" font-size="11" fill="#666">Зона 7, р.≥8</text>
-                    <circle class="zone-indicator" cx="780" cy="445" r="8" fill="#f44336"/>
+                    <text x="840" y="210" text-anchor="middle" font-size="13" font-weight="bold" fill="#c62828">СЕРВЕРНАЯ</text>
+                    <text x="840" y="230" text-anchor="middle" font-size="10" fill="#666">Зона 7, р.≥8</text>
+                    <circle class="zone-indicator" cx="840" cy="255" r="8" fill="#f44336"/>
                 </g>
-                
-                <!-- Зона 999 - Выход -->
+
+                <!-- Зона 999 - Выход (справа внизу) -->
                 <g class="zone-group" data-zone="999">
-                    <rect x="820" y="250" width="100" height="200" rx="8" 
+                    <rect x="820" y="500" width="100" height="80" rx="8"
                           fill="url(#zoneGrad)" stroke="#4caf50" stroke-width="3"/>
-                    <text x="870" y="340" text-anchor="middle" font-size="14" font-weight="bold" fill="#2e7d32">ВЫХОД</text>
-                    <text x="870" y="360" text-anchor="middle" font-size="11" fill="#666">Зона 999</text>
-                    <circle class="zone-indicator" cx="870" cy="380" r="8" fill="#4caf50"/>
+                    <text x="870" y="535" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">ВЫХОД</text>
+                    <text x="870" y="555" text-anchor="middle" font-size="9" fill="#666">Зона 999</text>
+                    <circle class="zone-indicator" cx="870" cy="570" r="8" fill="#4caf50"/>
                 </g>
                 
                 <!-- Двери -->
@@ -232,15 +232,15 @@
 <script>
 // Координаты зон для отображения пользователей
 const zoneCoordinates = {
-    '0': {x: 130, y: 320},
-    '1': {x: 275, y: 180},
-    '2': {x: 425, y: 180},
-    '3': {x: 575, y: 180},
-    '4': {x: 275, y: 520},
-    '5': {x: 425, y: 520},
-    '6': {x: 575, y: 520},
-    '7': {x: 780, y: 370},
-    '999': {x: 870, y: 320}
+    '0': {x: 130, y: 320},   // Вход
+    '1': {x: 275, y: 180},   // Офис 1
+    '2': {x: 425, y: 180},   // Офис 2
+    '3': {x: 575, y: 180},   // Офис 3
+    '4': {x: 275, y: 520},   // Кафетерий
+    '5': {x: 425, y: 520},   // Склад
+    '6': {x: 575, y: 520},   // Директор
+    '7': {x: 840, y: 200},   // Серверная (исправлено)
+    '999': {x: 870, y: 540}  // Выход (исправлено)
 };
 
 // Названия зон

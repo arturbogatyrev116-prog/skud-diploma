@@ -66,8 +66,13 @@
     <label style="margin-top: 15px; display: block;">Запрашиваемая зона:</label>
     <select name="zone_to" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
         <option value="0">Вход (ранг ≥3)</option>
-        <option value="1">Офис (ранг ≥5)</option>
-        <option value="2">Серверная (ранг ≥8)</option>
+        <option value="1">Офис 1 (ранг ≥5)</option>
+        <option value="2">Офис 2 (ранг ≥5)</option>
+        <option value="3">Офис 3 (ранг ≥5)</option>
+        <option value="4">Кафетерий (ранг ≥4)</option>
+        <option value="5">Склад (ранг ≥6)</option>
+        <option value="6">Директор (ранг ≥7)</option>
+        <option value="7">Серверная (ранг ≥8)</option>
         <option value="999">Выход (ранг ≥3)</option>
     </select><br>
 
@@ -255,8 +260,13 @@ function loadStatus() {
                 if (users.length > 0) {
                     const zoneNames = {
                         '0': 'Вход',
-                        '1': 'Офис',
-                        '2': 'Серверная',
+                        '1': 'Офис 1',
+                        '2': 'Офис 2',
+                        '3': 'Офис 3',
+                        '4': 'Кафетерий',
+                        '5': 'Склад',
+                        '6': 'Директор',
+                        '7': 'Серверная',
                         '999': 'Выход'
                     };
                     const zoneName = zoneNames[zoneId] || 'Зона ' + zoneId;
