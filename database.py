@@ -258,6 +258,18 @@ def increment_fail(uid: str):
         return False, None
 
 
+def get_block_until(uid: str):
+    """Получить время разблокировки пользователя"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT blocked_until FROM access_blocks WHERE uid = ?", (uid,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row[0]:
+        return datetime.datetime.fromisoformat(row[0])
+    return None
+
+
 def reset_fail(uid: str):
     """Сбросить счётчик неудачных попыток"""
     conn = get_connection()

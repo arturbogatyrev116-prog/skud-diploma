@@ -17,7 +17,7 @@ from config import (
 )
 from database import (
     init_db, add_user, get_user, log_access, get_zones_info,
-    check_block, increment_fail, reset_fail,
+    check_block, increment_fail, reset_fail, get_block_until,
     create_pending_pass, confirm_pass, cleanup_expired_passes,
     get_user_current_zone, get_user_history, get_all_users,
     get_recent_logs, delete_user, update_user, get_user_by_uid,
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-app.config['WTF_CSRF_ENABLED'] = False  # Отключено для тестирования
+app.config['WTF_CSRF_ENABLED'] = False
 csrf = CSRFProtect(app)
 
 # Инициализация БД при старте
@@ -119,21 +119,13 @@ def simulate_access():
     # Проверка блокировки
     is_blocked, fail_count = check_block(uid)
     if is_blocked:
-        conn = None
-        try:
-            import sqlite3
-            conn = sqlite3.connect('skud.db')
-            cursor = conn.cursor()
-            cursor.execute("SELECT blocked_until FROM access_blocks WHERE uid = ?", (uid,))
-            row = cursor.fetchone()
-            if row:
-                blocked_until = datetime.datetime.fromisoformat(row[0])
-                remaining = max(0, int((blocked_until - datetime.datetime.now()).total_seconds()))
-                flash(f"Доступ заблокирован на {remaining} секунд из-за {BLOCK_DURATION_MINUTES} минут", "error")
-                logger.warning(f"Попытка доступа заблокированного пользователя: {uid}")
-        finally:
-            if conn:
-                conn.close()
+        blocked_until = get_block_until(uid)
+        if blocked_until:
+            remaining = max(0, int((blocked_until - datetime.datetime.now()).total_seconds()))
+            flash(f"Доступ заблокирован. Осталось {remaining} секунд.", "error")
+        else:
+            flash("Доступ заблокирован.", "error")
+        logger.warning(f"Попытка доступа заблокированного пользователя: {uid}")
         return redirect(url_for('index'))
     
     # Проверка существования пользователя
@@ -542,4 +534,4 @@ def internal_error(error):
 
 if __name__ == '__main__':
     logger.info("Запуск сервера СКУД на порту 5000...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8000)

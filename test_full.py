@@ -101,8 +101,8 @@ def test_insufficient_rank():
     add_user(low_rank_uid, 4, low_rank_key, current_zone=0)
     
     zones_info = get_zones_info()
-    serverna_required = zones_info[2]['required_rank']
-    
+    serverna_required = zones_info[7]['required_rank']  # зона 7 = Серверная
+
     print(f"✓ Пользователь с рангом 4 пытается войти в Серверную (требуется {serverna_required})")
     print(f"✅ Ожидается отказ: ранг 4 < {serverna_required}")
     
