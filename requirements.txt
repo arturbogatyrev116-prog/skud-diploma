@@ -1,16 +1,16 @@
 flask>=2.3.0
-cryptography==42.0.0
+cryptography>=42.0.0
 flask-wtf>=1.2.0
+python-dotenv>=1.0.0
 
-# NFC зависимости (для Raspberry Pi)
-# Официальная библиотека Adafruit для PN532
-adafruit-circuitpython-pn532>=2.3.0
-# Зависимости Adafruit
-adafruit-circuitpython-busdevice>=5.0.0
-# spidev для SPI связи
-spidev>=3.5
-# RPi.GPIO для работы с GPIO
+# Генерация QR-кодов для онбординга мобильной страницы
+qrcode[pil]>=7.4
+
+# NFC зависимости (только Linux / Raspberry Pi — на Windows пропускаются)
+adafruit-circuitpython-pn532>=2.3.0; platform_system=="Linux"
+adafruit-circuitpython-busdevice>=5.0.0; platform_system=="Linux"
+spidev>=3.5; platform_system=="Linux"
 RPi.GPIO>=0.7.0; platform_system=="Linux" and platform_machine=="armv7l"
 
-# WebSocket для real-time уведомлений (опционально)
-flask-socketio>=5.3.0
+# WebSocket для real-time уведомлений (опционально, только Linux)
+flask-socketio>=5.3.0; platform_system=="Linux"

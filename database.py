@@ -134,6 +134,36 @@ def get_user(uid: str):
     return user
 
 
+def get_user_by_nfc_uid(raw_uid: str):
+    """
+    Поиск пользователя по сырому UID с NFC-чипа.
+
+    Web NFC возвращает serialNumber как "04:a3:1f:2b:7c:80", но в БД UID
+    могут храниться в разных форматах ("A1B2C3D4", "1", "ADMIN_01").
+    Перебираем несколько нормализаций и возвращаем (matched_uid, user)
+    при первом попадании или (raw_uid, None) если ничего не найдено.
+    """
+    if not raw_uid:
+        return raw_uid, None
+
+    stripped = raw_uid.replace(':', '').replace('-', '').replace(' ', '')
+    candidates = [
+        raw_uid,
+        stripped.upper(),
+        stripped.lower(),
+        stripped.upper().lstrip('0') or '0',
+    ]
+    seen = set()
+    for cand in candidates:
+        if cand in seen:
+            continue
+        seen.add(cand)
+        user = get_user(cand)
+        if user:
+            return cand, user
+    return raw_uid, None
+
+
 def get_user_current_zone(uid: str) -> int:
     """Получить текущую зону пользователя"""
     conn = get_connection()
@@ -172,12 +202,12 @@ def get_user_history(uid: str, limit: int = 10) -> list:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT zone_id, timestamp FROM user_history WHERE uid = ? ORDER BY timestamp DESC LIMIT ?",
+        "SELECT zone_id, timestamp FROM user_history WHERE uid = ? ORDER BY timestamp DESC, id DESC LIMIT ?",
         (uid, limit)
     )
     history = [row['zone_id'] for row in cursor.fetchall()]
     conn.close()
-    return list(reversed(history))  # Возвращаем в хронологическом порядке
+    return history  # Порядок DESC: history[0] — последняя (текущая) зона
 
 
 def log_access(uid: str, zone_from: int, zone_to: int, success: bool, reason: str = ""):
@@ -404,12 +434,13 @@ def delete_user(uid: str) -> bool:
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE uid = ?", (uid,))
-    deleted = cursor.rowcount > 0
-    # Также удаляем связанные записи
+    # Сначала удаляем связанные записи, потом пользователя
+    cursor.execute("DELETE FROM access_logs WHERE uid = ?", (uid,))
     cursor.execute("DELETE FROM access_blocks WHERE uid = ?", (uid,))
     cursor.execute("DELETE FROM pending_passes WHERE uid = ?", (uid,))
     cursor.execute("DELETE FROM user_history WHERE uid = ?", (uid,))
+    cursor.execute("DELETE FROM users WHERE uid = ?", (uid,))
+    deleted = cursor.rowcount > 0
     conn.commit()
     conn.close()
     if deleted:
@@ -417,7 +448,7 @@ def delete_user(uid: str) -> bool:
     return deleted
 
 
-def update_user(uid: str, rank: int = None, name: str = None, current_zone: int = None) -> bool:
+def update_user(uid: str, rank: int = None, current_zone: int = None) -> bool:
     """
     Обновить данные пользователя.
     Возвращает True если пользователь обновлён, False если не найден.
@@ -453,16 +484,6 @@ def update_user(uid: str, rank: int = None, name: str = None, current_zone: int 
     conn.close()
     return True
 
-
-def get_user_by_uid(uid: str):
-    """Получить пользователя по UID (полная информация)"""
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE uid = ?", (uid,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
 
 
 def get_users_with_zones():

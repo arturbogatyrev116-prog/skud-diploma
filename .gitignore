@@ -29,3 +29,11 @@ Thumbs.db
 # Временные файлы
 *.tmp
 *.bak
+
+# Секреты
+.env
+
+# ngrok (скачивается через setup.bat)
+tools/ngrok.exe
+tools/*.zip
+tools/ngrok.yml

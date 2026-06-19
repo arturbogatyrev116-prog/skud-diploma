@@ -9,8 +9,6 @@ import json
 import signal
 import logging
 import threading
-import hashlib
-import hmac
 from typing import Optional, Callable
 from datetime import datetime
 
@@ -23,10 +21,11 @@ from database import (
     get_user_history, create_pending_pass, log_access,
     check_block, increment_fail, reset_fail, add_user
 )
-from auth_logic import calculate_rank, is_history_valid, is_route_valid, is_context_valid
+from auth_logic import calculate_rank, is_history_valid, is_route_valid, is_context_valid, authenticate_user
 from config import (
     MAX_ATTEMPTS_RANK_HIGH, MAX_ATTEMPTS_RANK_MEDIUM,
-    MAX_ATTEMPTS_RANK_LOW, BLOCK_DURATION_MINUTES
+    MAX_ATTEMPTS_RANK_LOW, BLOCK_DURATION_MINUTES,
+    NFC_INTERFACE, NFC_RST_PIN, NFC_IRQ_PIN, NFC_SPI_CE, NFC_UART_PORT
 )
 
 # Настройка логгирования
@@ -65,13 +64,19 @@ class NFCService:
         self.auto_register = auto_register
         self.default_rank = default_rank
         self.callback = callback
-        
-        self.reader = NFCReader()
+
+        self.reader = NFCReader(
+            interface=NFC_INTERFACE,
+            rst_pin=NFC_RST_PIN,
+            irq_pin=NFC_IRQ_PIN,
+            spi_ce=NFC_SPI_CE,
+            uart_port=NFC_UART_PORT,
+        )
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.last_uid: Optional[str] = None
         self.last_read_time: float = 0
-        self.read_cooldown = 2.0  # Защита от повторных срабатываний
+        self.read_cooldown = 2.0
         
         # Статистика
         self.stats = {
@@ -97,50 +102,33 @@ class NFCService:
             self.callback(event)
     
     def _authenticate_user(
-        self, 
-        uid: str, 
-        user: dict, 
+        self,
+        uid: str,
+        user: dict,
         history: list,
         zones_info: dict
     ) -> tuple:
         """
-        Аутентификация пользователя
-        
         Returns:
             (success, message, combination)
         """
         user_rank = user['rank']
-        
-        # Определение количества попыток
+
         if user_rank >= 8:
             max_attempts = MAX_ATTEMPTS_RANK_HIGH
         elif user_rank >= 7:
             max_attempts = MAX_ATTEMPTS_RANK_MEDIUM
         else:
             max_attempts = MAX_ATTEMPTS_RANK_LOW
-        
+
         required_rank = zones_info[self.zone_to]['required_rank']
-        
-        # Попытка аутентификации
-        for attempt in range(max_attempts):
-            nonce = os.urandom(16)
-            history_bytes = json.dumps(history).encode()
-            T = hmac.new(
-                user['secret_key'].encode(), 
-                nonce + history_bytes, 
-                hashlib.sha256
-            ).digest()
-            combination = [(b % 13) + 1 for b in T[:5]]
-            actual_rank = calculate_rank(combination)
-            
-            if actual_rank == user_rank:
-                # Проверка прав доступа
-                if user_rank >= required_rank:
-                    return True, "Доступ разрешён", combination
-                else:
-                    return False, f"Недостаточно прав: {user_rank} < {required_rank}", None
-        
-        return False, "Аутентификация не удалась", None
+        success, combination = authenticate_user(user['secret_key'], user_rank, history, max_attempts)
+
+        if not success:
+            return False, "Аутентификация не удалась", None
+        if user_rank >= required_rank:
+            return True, "Доступ разрешён", combination
+        return False, f"Недостаточно прав: {user_rank} < {required_rank}", None
     
     def _process_card(self, uid: str):
         """Обработка обнаруженной карты"""

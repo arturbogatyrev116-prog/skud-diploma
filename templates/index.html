@@ -2,6 +2,55 @@
 {% block content %}
 <h2>🚪 Эмуляция прохода</h2>
 
+<!-- Предупреждение: если страница открыта на localhost, QR не будет работать -->
+<div id="localhost-warning" style="display:none; background: linear-gradient(135deg, #e65100, #bf360c); color: white; padding: 16px 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(230,81,0,0.3);">
+    <div style="display: flex; align-items: flex-start; gap: 14px;">
+        <div style="font-size: 28px; flex-shrink: 0;">⚠️</div>
+        <div style="flex: 1; min-width: 0;">
+            <strong style="font-size: 16px; display: block; margin-bottom: 6px;">QR-код не откроется с телефона</strong>
+            <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; opacity: 0.95;">
+                Страница открыта по <code style="background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 3px;" id="current-host-code">localhost</code> — QR ведёт туда же, а на телефоне «localhost» это сам телефон.
+            </p>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                <strong>Откройте эту страницу через ngrok URL</strong> (видно в окне «Ngrok Tunnel»):<br>
+                <span style="display: inline-block; margin-top: 6px; font-family: 'Courier New', monospace; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 4px; font-size: 13px;">https://xxxx.ngrok-free.app/</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- QR-карточка для открытия на мобильном -->
+<div style="background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%); padding: 18px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+    <img src="/qr/mobile" width="120" height="120" alt="QR на мобильную страницу"
+         style="background: white; border-radius: 8px; padding: 6px; flex-shrink: 0;">
+    <div style="flex: 1; min-width: 220px; color: white;">
+        <h3 style="margin: 0 0 6px 0;">📱 Открыть на телефоне</h3>
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.4;">
+            Отсканируйте QR-код Android-смартфоном. На странице будет работать <strong>Web NFC</strong> — прикладывайте реальные NFC-карты к задней панели телефона.
+        </p>
+        <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.5);">
+            iPhone — fallback на выбор из списка.
+        </p>
+    </div>
+</div>
+
+<script>
+// Проверка: открыта ли страница на localhost (QR не сработает на телефоне)
+(function checkLocalhost() {
+    const host = window.location.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1' ||
+                    host.startsWith('192.168.') || host.startsWith('10.') ||
+                    host.startsWith('172.');
+    if (isLocal) {
+        const warning = document.getElementById('localhost-warning');
+        if (warning) {
+            warning.style.display = 'block';
+            document.getElementById('current-host-code').textContent = host;
+        }
+    }
+})();
+</script>
+
 <!-- NFC Панель -->
 <div id="nfc-panel" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -19,8 +68,13 @@
                 </label>
                 <select id="nfc-zone" style="padding: 8px 12px; border-radius: 6px; border: none; font-size: 14px; width: 100%; max-width: 250px;">
                     <option value="0">Вход (ранг ≥3)</option>
-                    <option value="1" selected>Офис (ранг ≥5)</option>
-                    <option value="2">Серверная (ранг ≥8)</option>
+                    <option value="1" selected>Офис 1 (ранг ≥5)</option>
+                    <option value="2">Офис 2 (ранг ≥5)</option>
+                    <option value="3">Офис 3 (ранг ≥5)</option>
+                    <option value="4">Кафетерий (ранг ≥4)</option>
+                    <option value="5">Склад (ранг ≥6)</option>
+                    <option value="6">Директор (ранг ≥7)</option>
+                    <option value="7">Серверная (ранг ≥8)</option>
                     <option value="999">Выход (ранг ≥3)</option>
                 </select>
             </div>
@@ -46,6 +100,7 @@
 
 <!-- Форма ручной эмуляции -->
 <form method="POST" action="/simulate_access" style="background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h3 style="margin-top: 0; color: #333;">📝 Ручной ввод UID</h3>
     
     <label>UID карты:</label><br>
@@ -88,10 +143,13 @@
     <div style="margin-top: 20px; padding: 15px; background: #e6f4ea; border: 2px solid #34a853; border-radius: 8px;">
         <strong style="font-size: 16px;">✅ Дверь открыта!</strong><br>
         <span style="margin-top: 10px; display: block;">{{ message }}</span>
-        <a href="/confirm_pass/{{ session.current_uid }}"
-           style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #34a853; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
-            ✓ Подтвердить проход для {{ session.current_uid }}
-        </a>
+        <form method="POST" action="/confirm_pass/{{ session.current_uid }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit"
+               style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #34a853; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+                ✓ Подтвердить проход для {{ session.current_uid }}
+            </button>
+        </form>
     </div>
     {% elif category == 'error' %}
     <div style="margin-top: 20px; padding: 15px; background: #ffebee; border: 2px solid #f44336; border-radius: 8px;">
@@ -117,6 +175,7 @@
 let nfcAvailable = false;
 let autoPollInterval = null;
 let isAutoPolling = false;
+let zoneNames = {};
 
 // Проверка доступности NFC
 function checkNFCStatus() {
@@ -124,10 +183,14 @@ function checkNFCStatus() {
         .then(response => response.json())
         .then(data => {
             const statusEl = document.getElementById('nfc-status');
-            if (data.available && data.initialized) {
+            if (data.available && data.initialized && !data.emulation) {
                 statusEl.innerHTML = '✅ Подключен';
                 statusEl.style.background = 'rgba(76, 175, 80, 0.3)';
                 nfcAvailable = true;
+            } else if (data.available && data.emulation) {
+                statusEl.innerHTML = '⚠️ Эмуляция (без железа)';
+                statusEl.style.background = 'rgba(255, 152, 0, 0.3)';
+                nfcAvailable = false;
             } else if (data.available) {
                 statusEl.innerHTML = '⚠️ Инициализация...';
                 statusEl.style.background = 'rgba(255, 152, 0, 0.3)';
@@ -248,6 +311,16 @@ function toggleAutoPoll() {
     }
 }
 
+// Загрузка названий зон из API
+function loadZoneNames() {
+    return fetch('/api/zones')
+        .then(response => response.json())
+        .then(data => {
+            data.zones.forEach(z => { zoneNames[String(z.id)] = z.name; });
+        })
+        .catch(() => {});
+}
+
 // Загрузка статуса системы
 function loadStatus() {
     fetch('/api/status')
@@ -258,17 +331,6 @@ function loadStatus() {
 
             for (const [zoneId, users] of Object.entries(data.users_by_zone)) {
                 if (users.length > 0) {
-                    const zoneNames = {
-                        '0': 'Вход',
-                        '1': 'Офис 1',
-                        '2': 'Офис 2',
-                        '3': 'Офис 3',
-                        '4': 'Кафетерий',
-                        '5': 'Склад',
-                        '6': 'Директор',
-                        '7': 'Серверная',
-                        '999': 'Выход'
-                    };
                     const zoneName = zoneNames[zoneId] || 'Зона ' + zoneId;
                     const userNames = users.map(u => u.uid + ' (р.' + u.rank + ')').join(', ');
                     html += '<tr>';
@@ -296,8 +358,10 @@ function loadStatus() {
 // Инициализация при загрузке
 checkNFCStatus();
 setInterval(checkNFCStatus, 10000); // Проверка NFC каждые 10 секунд
-loadStatus();
-setInterval(loadStatus, 5000);
+loadZoneNames().then(() => {
+    loadStatus();
+    setInterval(loadStatus, 5000);
+});
 </script>
 
 {% endblock %}

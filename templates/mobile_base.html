@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1a252f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="СКУД">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="manifest" href="/manifest.json">
+    <title>СКУД — {% block title %}{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(160deg, #2c3e50 0%, #1a252f 100%);
+            color: #ecf0f1;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+        body {
+            display: flex; flex-direction: column;
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: calc(64px + env(safe-area-inset-bottom));
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        /* === Header === */
+        .m-header {
+            position: sticky; top: 0; z-index: 50;
+            background: linear-gradient(180deg, rgba(26,37,47,0.95), rgba(26,37,47,0.85));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .m-header-title {
+            font-size: 14px; font-weight: bold; letter-spacing: 1.5px;
+        }
+        .m-back-link {
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            font-size: 13px;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .m-back-link:active { background: rgba(255,255,255,0.08); }
+        .m-led {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #4caf50; box-shadow: 0 0 8px #4caf50;
+            transition: all 0.3s;
+        }
+
+        /* === Main content === */
+        .m-content {
+            flex: 1;
+            display: flex; flex-direction: column;
+            min-height: 0;
+        }
+
+        /* === Tab bar === */
+        .m-tabbar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            display: flex;
+            background: rgba(13,20,28,0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 100;
+        }
+        .m-tab {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 9px 4px 6px;
+            text-decoration: none;
+            color: rgba(255,255,255,0.45);
+            font-size: 10px;
+            transition: color 0.2s;
+            min-height: 56px;
+        }
+        .m-tab-icon {
+            font-size: 22px;
+            line-height: 1;
+            margin-bottom: 3px;
+        }
+        .m-tab-label {
+            font-size: 10px;
+            letter-spacing: 0.3px;
+        }
+        .m-tab.active {
+            color: #4caf50;
+        }
+        .m-tab:active {
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* === Common UI === */
+        .m-banner {
+            margin: 12px 16px;
+            padding: 12px 14px;
+            background: rgba(255,193,7,0.15);
+            border-left: 3px solid #ffc107;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #fff8e1;
+            line-height: 1.4;
+        }
+        .m-banner.error {
+            background: rgba(244,67,54,0.18);
+            border-left-color: #f44336;
+            color: #ffcdd2;
+        }
+        .m-banner.success {
+            background: rgba(76,175,80,0.18);
+            border-left-color: #4caf50;
+            color: #c8e6c9;
+        }
+
+        .m-toast {
+            position: fixed;
+            bottom: calc(80px + env(safe-area-inset-bottom));
+            left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.88);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 24px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 90vw;
+        }
+        .m-toast.show { opacity: 1; }
+
+        .m-btn {
+            display: block;
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .m-btn-primary { background: #4caf50; color: white; }
+        .m-btn-secondary { background: #2196f3; color: white; }
+        .m-btn-danger { background: #f44336; color: white; }
+        .m-btn:active { transform: scale(0.98); }
+        .m-btn:disabled { background: #9e9e9e; box-shadow: none; }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <header class="m-header">
+        <a href="/" class="m-back-link">← Главная</a>
+        <div class="m-header-title">{% block header_title %}📡 СКУД{% endblock %}</div>
+        <div id="m-led" class="m-led"></div>
+    </header>
+
+    <main class="m-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="m-tabbar">
+        <a href="/mobile/scan" class="m-tab{% if active_tab == 'scan' %} active{% endif %}">
+            <span class="m-tab-icon">📡</span>
+            <span class="m-tab-label">Сканер</span>
+        </a>
+        <a href="/mobile/register" class="m-tab{% if active_tab == 'register' %} active{% endif %}">
+            <span class="m-tab-icon">➕</span>
+            <span class="m-tab-label">Регистр.</span>
+        </a>
+        <a href="/mobile/users" class="m-tab{% if active_tab == 'users' %} active{% endif %}">
+            <span class="m-tab-icon">👤</span>
+            <span class="m-tab-label">Польз.</span>
+        </a>
+        <a href="/mobile/logs" class="m-tab{% if active_tab == 'logs' %} active{% endif %}">
+            <span class="m-tab-icon">📋</span>
+            <span class="m-tab-label">Журнал</span>
+        </a>
+    </nav>
+
+    <div id="m-toast" class="m-toast"></div>
+
+    <script>
+        // Общие утилиты для всех мобильных страниц
+        const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+        function mShowToast(msg, durationMs = 2000) {
+            const t = document.getElementById('m-toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), durationMs);
+        }
+
+        function mSetLed(color) {
+            const led = document.getElementById('m-led');
+            led.style.background = color;
+            led.style.boxShadow = `0 0 8px ${color}`;
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

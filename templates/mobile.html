@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1a252f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="СКУД">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="manifest" href="/manifest.json">
+    <title>СКУД Сканер</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(160deg, #2c3e50 0%, #1a252f 100%);
+            color: #ecf0f1;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+        body {
+            display: flex; flex-direction: column;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .header-title {
+            font-size: 13px; font-weight: bold; letter-spacing: 1.5px;
+        }
+        .back-link {
+            color: rgba(255,255,255,0.5); text-decoration: none; font-size: 13px;
+        }
+        .led {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #4caf50; box-shadow: 0 0 8px #4caf50;
+            transition: all 0.3s;
+        }
+
+        .zones {
+            display: flex; gap: 8px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .zones::-webkit-scrollbar { display: none; }
+        .zone-chip {
+            flex: 0 0 auto;
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.7);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            scroll-snap-align: start;
+            transition: all 0.2s;
+        }
+        .zone-chip.active {
+            background: #2196f3;
+            color: white;
+            border-color: #2196f3;
+        }
+        .zone-chip .rank {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-left: 4px;
+        }
+
+        .main {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px 16px;
+            min-height: 0;
+        }
+        .screen {
+            width: 100%; max-width: 360px;
+            background: #1b4332;
+            border: 2px solid #0d1f1c;
+            border-radius: 12px;
+            padding: 32px 20px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            color: #95d5b2;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            min-height: 240px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: all 0.3s;
+        }
+        .screen-icon { font-size: 56px; margin-bottom: 12px; line-height: 1; }
+        .screen-title { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .screen-sub { font-size: 13px; margin-top: 12px; opacity: 0.85; line-height: 1.4; padding: 0 12px; }
+        .screen-uid { font-size: 11px; margin-top: 16px; opacity: 0.6; font-family: 'Courier New', monospace; }
+
+        @keyframes scanbar {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        .scan-progress {
+            margin-top: 16px; width: 80%; height: 4px;
+            background: rgba(255,213,79,0.2); border-radius: 2px; overflow: hidden;
+        }
+        .scan-progress > div {
+            width: 30%; height: 100%; background: #ffd54f;
+            animation: scanbar 1s linear infinite;
+        }
+
+        .banner {
+            margin: 12px 16px;
+            padding: 12px 14px;
+            background: rgba(255,193,7,0.15);
+            border-left: 3px solid #ffc107;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #fff8e1;
+            line-height: 1.4;
+        }
+        .banner.error {
+            background: rgba(244,67,54,0.18);
+            border-left-color: #f44336;
+            color: #ffcdd2;
+        }
+
+        .fallback {
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        .fallback h3 {
+            margin: 0 0 12px 0; font-size: 13px;
+            color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px;
+        }
+        .fallback select, .fallback button {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.15);
+            margin-bottom: 8px;
+        }
+        .fallback select {
+            background: rgba(255,255,255,0.08);
+            color: #ecf0f1;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%23ecf0f1' d='M4 6l4 4 4-4z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        .fallback button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(76,175,80,0.3);
+        }
+        .fallback button:active { transform: scale(0.98); }
+        .fallback button:disabled { background: #9e9e9e; box-shadow: none; }
+
+        .toast {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 24px);
+            left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 24px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/terminal" class="back-link">← В админку</a>
+        <div class="header-title">📡 СКУД</div>
+        <div id="led" class="led"></div>
+    </div>
+
+    <div class="zones" id="zones">
+        {% for zone_id, zone in zones.items() %}
+        <div class="zone-chip{% if zone_id == 1 %} active{% endif %}" data-zone="{{ zone_id }}">
+            {{ zone.name }}<span class="rank">≥{{ zone.required_rank }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="permission-banner" class="banner" style="display:none;"></div>
+
+    <div class="main">
+        <div id="screen" class="screen">
+            <div id="screen-icon" class="screen-icon">📡</div>
+            <div id="screen-title" class="screen-title">NFC СКАНЕР</div>
+            <div id="screen-sub" class="screen-sub">Нажмите кнопку ниже, чтобы активировать сканер. Браузер запросит разрешение.</div>
+        </div>
+        <button id="activate-btn" onclick="activateNFC()" style="margin-top: 20px; width: 100%; max-width: 360px; padding: 16px; background: #4caf50; color: white; border: none; border-radius: 10px; font-size: 17px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 14px rgba(76,175,80,0.4); -webkit-tap-highlight-color: transparent;">
+            🟢 Активировать NFC
+        </button>
+    </div>
+
+    <div class="fallback" id="fallback" style="display:none;">
+        <h3>Ручной выбор карты</h3>
+        <select id="manual-uid">
+            <option value="">— выберите карту —</option>
+            {% for user in users %}
+            <option value="{{ user.uid }}">{{ user.uid }} (ранг {{ user.rank }})</option>
+            {% endfor %}
+        </select>
+        <button id="manual-scan" onclick="manualScan()">Сканировать</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+<script>
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+const screen = document.getElementById('screen');
+const screenIcon = document.getElementById('screen-icon');
+const screenTitle = document.getElementById('screen-title');
+const screenSub = document.getElementById('screen-sub');
+const led = document.getElementById('led');
+const banner = document.getElementById('permission-banner');
+const fallback = document.getElementById('fallback');
+const toast = document.getElementById('toast');
+const zonesEl = document.getElementById('zones');
+
+let activeZone = 1;
+let lastUid = null;
+let lastScanAt = 0;
+let resetTimer = null;
+let pendingConfirmUid = null;
+let pendingConfirmTimer = null;
+let reader = null;
+let abortCtl = null;
+
+// === Управление чипами зон ===
+zonesEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('.zone-chip');
+    if (!chip) return;
+    document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeZone = parseInt(chip.dataset.zone, 10);
+});
+
+// === Утилиты UI ===
+function showToast(msg, durationMs = 2000) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), durationMs);
+}
+
+function setLed(color) {
+    led.style.background = color;
+    led.style.boxShadow = `0 0 8px ${color}`;
+}
+
+function setScreen(bg, fg, icon, title, sub = '', uid = '', extraHtml = '') {
+    screen.style.background = bg;
+    screen.style.borderColor = bg;
+    screen.style.color = fg;
+    screen.innerHTML = `
+        <div class="screen-icon" style="font-size:56px;margin-bottom:12px;line-height:1;">${icon}</div>
+        <div class="screen-title" style="font-size:18px;font-weight:bold;letter-spacing:1px;">${title}</div>
+        ${sub ? `<div class="screen-sub" style="font-size:13px;margin-top:12px;opacity:0.85;line-height:1.4;padding:0 12px;">${sub}</div>` : ''}
+        ${uid ? `<div class="screen-uid" style="font-size:11px;margin-top:16px;opacity:0.6;font-family:'Courier New',monospace;">UID: ${uid}</div>` : ''}
+        ${extraHtml}
+    `;
+}
+
+function resetScreen() {
+    cancelPendingConfirm();
+    setLed('#4caf50');
+    setScreen('#1b4332', '#95d5b2', '📡', 'ПРИЛОЖИТЕ КАРТУ', 'К задней панели телефона');
+}
+
+function showScanning() {
+    setLed('#ff9800');
+    setScreen('#3a3520', '#ffd54f', '📡', 'СЧИТЫВАНИЕ...', '',
+        '', '<div class="scan-progress"><div></div></div>');
+}
+
+// === Отображение результата ===
+function showResult(data) {
+    if (resetTimer) clearTimeout(resetTimer);
+
+    switch (data.action) {
+        case 'granted':
+            setLed('#4caf50');
+            setScreen('#0e3b1c', '#a5d6a7', '✅', 'ДОСТУП РАЗРЕШЁН',
+                `${data.zone_from_name || ''} → ${data.zone_to_name || ''}`,
+                data.uid);
+            schedulePendingConfirm(data.uid);
+            resetTimer = setTimeout(resetScreen, 3500);
+            break;
+        case 'denied':
+            setLed('#f44336');
+            setScreen('#3b0e0e', '#ef9a9a', '⛔', 'ОТКАЗ', data.message, data.uid);
+            resetTimer = setTimeout(resetScreen, 3500);
+            break;
+        case 'blocked':
+            setLed('#f44336');
+            setScreen('#3b0e0e', '#ef9a9a', '🔒', 'ЗАБЛОКИРОВАНА', data.message, data.uid);
+            resetTimer = setTimeout(resetScreen, 4000);
+            break;
+        case 'unknown':
+            setLed('#ff9800');
+            setScreen('#3a3520', '#ffd54f', '❓', 'КАРТА НЕИЗВЕСТНА', 'Зарегистрируйте через /users', data.uid);
+            resetTimer = setTimeout(resetScreen, 4500);
+            break;
+        default:
+            setLed('#f44336');
+            setScreen('#3b0e0e', '#ef9a9a', '⚠️', 'ОШИБКА', data.message || 'Неизвестная ошибка');
+            resetTimer = setTimeout(resetScreen, 3000);
+    }
+}
+
+// === Авто-подтверждение прохода (через 3s после granted) ===
+function schedulePendingConfirm(uid) {
+    pendingConfirmUid = uid;
+    pendingConfirmTimer = setTimeout(() => {
+        if (!pendingConfirmUid) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF_TOKEN);
+        fetch(`/confirm_pass/${encodeURIComponent(pendingConfirmUid)}`, {
+            method: 'POST', body: fd, redirect: 'follow'
+        }).catch(() => {});
+        pendingConfirmUid = null;
+        pendingConfirmTimer = null;
+    }, 3000);
+}
+
+function cancelPendingConfirm() {
+    if (pendingConfirmTimer) clearTimeout(pendingConfirmTimer);
+    pendingConfirmTimer = null;
+    pendingConfirmUid = null;
+}
+
+// === Основной обработчик скана ===
+async function processScan(rawUid) {
+    const now = Date.now();
+    if (rawUid === lastUid && (now - lastScanAt) < 2500) {
+        return;
+    }
+    lastUid = rawUid;
+    lastScanAt = now;
+
+    showScanning();
+    await new Promise(r => setTimeout(r, 600));
+
+    try {
+        const response = await fetch('/api/terminal/scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({uid: rawUid, zone_to: activeZone})
+        });
+        const data = await response.json();
+        showResult(data);
+    } catch (err) {
+        setLed('#f44336');
+        setScreen('#3b0e0e', '#ef9a9a', '🌐', 'НЕТ СОЕДИНЕНИЯ', 'Проверьте интернет');
+        resetTimer = setTimeout(resetScreen, 3000);
+    }
+}
+
+// === Проверка поддержки NFC при загрузке (без вызова scan) ===
+function checkNfcSupport() {
+    const NFC_OK = 'NDEFReader' in window;
+    const HTTPS_OK = window.isSecureContext;
+    const btn = document.getElementById('activate-btn');
+
+    if (!NFC_OK) {
+        showBanner('NFC не поддерживается на этом устройстве (iPhone или не-Chrome). Используйте ручной выбор карты ниже.', false);
+        if (btn) btn.style.display = 'none';
+        fallback.style.display = 'block';
+        setScreen('#1b4332', '#95d5b2', '📱', 'NFC НЕ ДОСТУПЕН', 'Выберите карту вручную ниже');
+        return false;
+    }
+    if (!HTTPS_OK) {
+        showBanner('Web NFC требует HTTPS. Откройте страницу через ngrok-ссылку.', true);
+        if (btn) btn.style.display = 'none';
+        fallback.style.display = 'block';
+        return false;
+    }
+    return true;
+}
+
+// === Активация NFC (вызывается ПО КЛИКУ — это user gesture, требуется Chrome) ===
+async function activateNFC() {
+    const btn = document.getElementById('activate-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Запрашиваю разрешение...';
+        btn.style.background = '#9e9e9e';
+    }
+
+    try {
+        reader = new NDEFReader();
+        abortCtl = new AbortController();
+        await reader.scan({signal: abortCtl.signal});
+
+        reader.onreading = (event) => {
+            const uid = (event.serialNumber || '').toString();
+            if (uid) processScan(uid);
+        };
+        reader.onreadingerror = () => {
+            showToast('Не удалось прочитать карту');
+        };
+
+        // Успех — скрываем кнопку, показываем рабочий экран
+        if (btn) btn.style.display = 'none';
+        banner.style.display = 'none';
+        resetScreen();
+        showToast('NFC активирован — приложите карту', 2500);
+    } catch (err) {
+        const name = err.name || 'UnknownError';
+        let msg = '';
+        switch (name) {
+            case 'NotAllowedError':
+                msg = 'Разрешение на NFC отклонено. Тапните на замочек в адресной строке → Разрешения → разрешите NFC, затем перезагрузите страницу.';
+                break;
+            case 'NotSupportedError':
+                msg = 'Это устройство не поддерживает NFC. Используйте ручной выбор ниже.';
+                break;
+            case 'NotReadableError':
+                msg = 'Включите NFC в системных настройках телефона и нажмите кнопку снова.';
+                break;
+            case 'SecurityError':
+                msg = 'Web NFC требует HTTPS (откройте через ngrok-ссылку).';
+                break;
+            case 'InvalidStateError':
+                msg = 'NFC уже активен в другой вкладке. Закройте другие вкладки и попробуйте снова.';
+                break;
+            default:
+                msg = `Ошибка NFC: ${err.message || name}`;
+        }
+        showBanner(msg, true);
+        fallback.style.display = 'block';
+
+        // Возвращаем кнопку для повторной попытки
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔁 Повторить активацию';
+            btn.style.background = '#ff9800';
+        }
+    }
+}
+
+function showBanner(text, isError) {
+    banner.textContent = text;
+    banner.className = isError ? 'banner error' : 'banner';
+    banner.style.display = 'block';
+}
+
+// === Ручной режим ===
+function manualScan() {
+    const sel = document.getElementById('manual-uid');
+    const uid = sel.value;
+    if (!uid) {
+        showToast('Выберите карту из списка');
+        return;
+    }
+    // Сбрасываем дебаунс при ручном вводе — пользователь явно нажал
+    lastUid = null;
+    processScan(uid);
+}
+
+// === Старт: только проверяем поддержку, scan() будет по клику ===
+checkNfcSupport();
+</script>
+</body>
+</html>

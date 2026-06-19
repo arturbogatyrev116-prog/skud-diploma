@@ -267,18 +267,8 @@ const zoneCoordinates = {
     '999': {x: 820, y: 455}   // Выход
 };
 
-// Названия зон
-const zoneNames = {
-    '0': 'Вход',
-    '1': 'Офис 1',
-    '2': 'Офис 2',
-    '3': 'Офис 3',
-    '4': 'Кафетерий',
-    '5': 'Склад',
-    '6': 'Директор',
-    '7': 'Серверная',
-    '999': 'Выход'
-};
+// Названия зон (заполняются из API)
+let zoneNames = {};
 
 // Цвета для рангов
 const rankColors = {
@@ -290,6 +280,16 @@ const rankColors = {
     8: '#d32f2f',
     9: '#d32f2f'
 };
+
+// Загрузка названий зон из API
+function loadZoneNames() {
+    return fetch('/api/zones')
+        .then(response => response.json())
+        .then(data => {
+            data.zones.forEach(z => { zoneNames[String(z.id)] = z.name; });
+        })
+        .catch(() => {});
+}
 
 // Загрузка и отображение пользователей
 function loadUsers() {
@@ -412,7 +412,9 @@ function updateUsersPanel(usersByZone) {
 }
 
 // Загружаем при старте и обновляем каждые 3 секунды
-loadUsers();
-setInterval(loadUsers, 3000);
+loadZoneNames().then(() => {
+    loadUsers();
+    setInterval(loadUsers, 3000);
+});
 </script>
 {% endblock %}

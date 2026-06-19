@@ -1,0 +1,318 @@
+{% extends "mobile_base.html" %}
+{% set active_tab = 'users' %}
+{% block title %}Пользователи{% endblock %}
+{% block content %}
+<style>
+    .users-wrap {
+        display: flex; flex-direction: column;
+        padding: 0 0 16px 0;
+    }
+    .search-bar {
+        position: sticky; top: 0; z-index: 10;
+        background: linear-gradient(160deg, #2c3e50 0%, #1a252f 100%);
+        padding: 12px 16px 10px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .search-bar input {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 14px;
+        font-size: 16px;
+        background: rgba(255,255,255,0.08);
+        color: #ecf0f1;
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 10px;
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    .search-bar input::placeholder {
+        color: rgba(255,255,255,0.4);
+    }
+    .search-bar input:focus {
+        border-color: #2196f3;
+        background: rgba(255,255,255,0.12);
+    }
+    .counter {
+        padding: 10px 16px 6px 16px;
+        font-size: 12px;
+        color: rgba(255,255,255,0.6);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .user-list {
+        display: flex; flex-direction: column;
+        gap: 10px;
+        padding: 4px 16px 16px 16px;
+    }
+    .user-card {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 14px;
+        display: flex; flex-direction: column;
+        gap: 8px;
+        transition: background 0.15s;
+    }
+    .user-card.removing {
+        opacity: 0; transform: translateX(40px);
+        transition: opacity 0.25s, transform 0.25s;
+    }
+    .user-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 10px;
+    }
+    .user-uid {
+        font-family: 'Courier New', monospace;
+        font-size: 17px;
+        font-weight: bold;
+        color: #ecf0f1;
+        word-break: break-all;
+        flex: 1;
+        min-width: 0;
+    }
+    .rank-badge {
+        flex: 0 0 auto;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+        color: white;
+        letter-spacing: 0.5px;
+        min-width: 40px;
+        text-align: center;
+    }
+    .rank-3, .rank-4 { background: #4caf50; }
+    .rank-5, .rank-6 { background: #2196f3; }
+    .rank-7         { background: #ff9800; }
+    .rank-8, .rank-9 { background: #f44336; }
+    .user-meta {
+        display: flex; flex-direction: column; gap: 4px;
+        font-size: 13px;
+        color: rgba(255,255,255,0.75);
+    }
+    .user-meta .zone {
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .user-created {
+        font-size: 11px;
+        color: rgba(255,255,255,0.5);
+        font-family: 'Courier New', monospace;
+    }
+    .actions-row {
+        display: flex; justify-content: flex-end; align-items: center;
+        gap: 8px;
+    }
+    .btn-expand, .btn-delete {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.1s;
+    }
+    .btn-expand:active, .btn-delete:active { transform: scale(0.97); }
+    .btn-expand {
+        background: rgba(255,255,255,0.1);
+        color: #ecf0f1;
+        border: 1px solid rgba(255,255,255,0.15);
+    }
+    .btn-delete {
+        background: #f44336;
+        color: white;
+        box-shadow: 0 2px 8px rgba(244,67,54,0.4);
+        display: none;
+    }
+    .user-card.expanded .btn-delete { display: inline-flex; align-items: center; }
+    .user-card.expanded .btn-expand {
+        background: rgba(255,255,255,0.18);
+    }
+
+    .empty-state {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        text-align: center;
+        padding: 60px 24px;
+        color: rgba(255,255,255,0.6);
+    }
+    .empty-state .emoji {
+        font-size: 72px; line-height: 1; margin-bottom: 16px; opacity: 0.7;
+    }
+    .empty-state .text {
+        font-size: 15px; line-height: 1.5; max-width: 280px;
+    }
+    .empty-state.hidden { display: none; }
+
+    .toast {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom) + 80px);
+        left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.88);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 24px;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+        z-index: 1000;
+        max-width: 80%;
+        text-align: center;
+    }
+    .toast.show { opacity: 1; }
+</style>
+
+<div class="users-wrap">
+    <div class="search-bar">
+        <input type="text" id="search-input" placeholder="🔍 Поиск по UID..." autocomplete="off" inputmode="search">
+    </div>
+
+    <div class="counter" id="counter">
+        Всего: <span id="counter-num">{{ users|length }}</span> пользователей
+    </div>
+
+    <div class="user-list" id="user-list">
+        {% for user in users %}
+        <div class="user-card" data-uid="{{ user.uid }}">
+            <div class="user-row">
+                <div class="user-uid">{{ user.uid }}</div>
+                <div class="rank-badge rank-{{ user.rank }}">Ранг {{ user.rank }}</div>
+            </div>
+            <div class="user-meta">
+                <span class="zone">📍 {{ user.zone_name if user.zone_name else 'Зона ' ~ user.current_zone }}</span>
+                <span class="user-created">🕒 {{ user.created_at if user.created_at else 'N/A' }}</span>
+            </div>
+            <div class="actions-row">
+                <button type="button" class="btn-expand" onclick="toggleCard(this)" aria-label="Действия">
+                    ⋯
+                </button>
+                <button type="button" class="btn-delete" onclick="deleteUser('{{ user.uid }}', this)">
+                    🗑️ Удалить
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="empty-state {% if users|length > 0 %}hidden{% endif %}" id="empty-state">
+        <div class="emoji">👤</div>
+        <div class="text">Нет пользователей. Зарегистрируйте карту во вкладке Регистр.</div>
+    </div>
+
+    <div class="empty-state hidden" id="no-results">
+        <div class="emoji">🔎</div>
+        <div class="text">Ничего не найдено</div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function() {
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+    const searchInput = document.getElementById('search-input');
+    const userList = document.getElementById('user-list');
+    const counterNum = document.getElementById('counter-num');
+    const emptyState = document.getElementById('empty-state');
+    const noResults = document.getElementById('no-results');
+    const toast = document.getElementById('toast');
+
+    function showToast(msg, durationMs) {
+        durationMs = durationMs || 2200;
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, durationMs);
+    }
+
+    function refreshCounter() {
+        const cards = userList.querySelectorAll('.user-card');
+        const visible = userList.querySelectorAll('.user-card:not([hidden])');
+        counterNum.textContent = cards.length;
+
+        const totalCards = cards.length;
+        const totalVisible = visible.length;
+
+        if (totalCards === 0) {
+            emptyState.classList.remove('hidden');
+            noResults.classList.add('hidden');
+        } else if (totalVisible === 0) {
+            emptyState.classList.add('hidden');
+            noResults.classList.remove('hidden');
+        } else {
+            emptyState.classList.add('hidden');
+            noResults.classList.add('hidden');
+        }
+    }
+
+    // Поиск по UID
+    searchInput.addEventListener('input', function() {
+        const q = this.value.trim().toLowerCase();
+        const cards = userList.querySelectorAll('.user-card');
+        cards.forEach(function(card) {
+            const uid = (card.dataset.uid || '').toLowerCase();
+            if (!q || uid.indexOf(q) !== -1) {
+                card.hidden = false;
+            } else {
+                card.hidden = true;
+            }
+        });
+        refreshCounter();
+    });
+
+    // Раскрытие карточки
+    window.toggleCard = function(btn) {
+        const card = btn.closest('.user-card');
+        if (!card) return;
+        // схлопнуть все остальные
+        document.querySelectorAll('.user-card.expanded').forEach(function(c) {
+            if (c !== card) c.classList.remove('expanded');
+        });
+        card.classList.toggle('expanded');
+    };
+
+    // Удаление
+    window.deleteUser = function(uid, btn) {
+        if (!window.confirm('Удалить пользователя ' + uid + '?')) return;
+
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = '⏳ Удаление...';
+
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF_TOKEN);
+
+        fetch('/delete_user/' + encodeURIComponent(uid), {
+            method: 'POST',
+            body: fd,
+            redirect: 'manual'
+        }).then(function(response) {
+            if (response.ok || response.status === 0 || response.status === 302 || response.type === 'opaqueredirect') {
+                const card = btn.closest('.user-card');
+                if (card) {
+                    card.classList.add('removing');
+                    setTimeout(function() {
+                        card.remove();
+                        refreshCounter();
+                    }, 260);
+                }
+                showToast('Пользователь удалён');
+            } else {
+                btn.disabled = false;
+                btn.textContent = originalText;
+                showToast('Ошибка: ' + response.status);
+            }
+        }).catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+            showToast('Сбой сети');
+        });
+    };
+
+    // первоначальное обновление состояния
+    refreshCounter();
+})();
+</script>
+{% endblock %}

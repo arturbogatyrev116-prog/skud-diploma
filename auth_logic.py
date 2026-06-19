@@ -3,6 +3,10 @@
 Вычисление рангов на основе покерных комбинаций и валидация маршрутов
 """
 from collections import Counter
+import os
+import hmac
+import hashlib
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -166,11 +170,37 @@ def is_route_valid(history: list, requested_zone: int, zones_info: dict) -> tupl
 def generate_combination_from_token(token: bytes) -> list:
     """
     Сгенерировать комбинацию из 5 чисел из токена.
-    
+
     Args:
         token: Байты токена HMAC
-    
+
     Returns:
         Список из 5 чисел (1-13)
     """
     return [(b % 13) + 1 for b in token[:5]]
+
+
+def authenticate_user(secret_key: str, user_rank: int, history: list, max_attempts: int) -> tuple:
+    """
+    Попытка аутентификации пользователя через HMAC + покерный ранг.
+
+    Args:
+        secret_key: Секретный ключ пользователя (hex-строка)
+        user_rank: Ожидаемый ранг пользователя (3-9)
+        history: История перемещений (history[0] — текущая зона)
+        max_attempts: Максимальное количество попыток
+
+    Returns:
+        (success: bool, combination: list | None)
+    """
+    history_bytes = json.dumps(history).encode()
+    key_bytes = secret_key.encode() if isinstance(secret_key, str) else secret_key
+
+    for _ in range(max_attempts):
+        nonce = os.urandom(16)
+        token = hmac.new(key_bytes, nonce + history_bytes, hashlib.sha256).digest()
+        combination = generate_combination_from_token(token)
+        if calculate_rank(combination) == user_rank:
+            return True, combination
+
+    return False, None

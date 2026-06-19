@@ -30,26 +30,28 @@
 
 ```
 skud-diploma/
-├── core/
-│   ├── app.py              # Веб-сервер Flask
-│   ├── auth_logic.py       # Логика аутентификации
-│   ├── database.py         # Работа с SQLite
-│   └── config.py           # Конфигурация
-├── nfc/
-│   ├── reader.py           # Модуль работы с PN532
-│   └── service.py          # Фоновый NFC сервис
-├── templates/              # HTML шаблоны
-├── tests/
-│   ├── test_core.py        # Тесты ядра
-│   └── test_nfc.py         # Тесты NFC
-├── scripts/
-│   ├── install.sh          # Установка зависимостей
-│   └── install_systemd.sh  # systemd сервисы
+├── app.py                  # Веб-сервер Flask
+├── auth_logic.py           # Логика аутентификации
+├── database.py             # Работа с SQLite
+├── config.py               # Конфигурация
+├── nfc_reader.py           # Модуль работы с PN532
+├── nfc_service.py          # Фоновый NFC сервис
+├── personalize.py          # CLI для регистрации пользователей
+├── create_tables.py        # Инициализация схемы БД
+├── diagnose_nfc.py         # Диагностика NFC-подключения
+├── templates/              # HTML шаблоны (Flask)
 ├── docs/
 │   ├── NFC.md              # NFC интеграция
 │   └── TROUBLESHOOTING.md  # Решение проблем
+├── test_full.py            # Тесты ядра
+├── test_nfc.py             # Тесты NFC
+├── install.sh              # Установка зависимостей (Linux)
+├── install_rpi.sh          # Установка на Raspberry Pi
+├── install_systemd.sh      # systemd сервисы
+├── start_web_server.sh     # Запуск веб-сервера
+├── start_nfc_service.sh    # Запуск NFC сервиса
 ├── requirements.txt
-├── personalize.py          # CLI для пользователей
+├── .env.example            # Пример конфигурации окружения
 └── README.md               # Этот файл
 ```
 
@@ -77,11 +79,11 @@ SDA            →    GPIO 2 (Pin 3)     # I2C
 ### 3. Запуск
 
 ```bash
-# Веб + NFC
-./start.sh --nfc
-
 # Только веб
-./start_web.sh
+./start_web_server.sh
+
+# NFC сервис (отдельно)
+sudo ./start_nfc_service.sh
 ```
 
 **Откройте:** http://localhost:5000
@@ -97,9 +99,9 @@ SDA            →    GPIO 2 (Pin 3)     # I2C
 
 ### Кратко
 
-- **Установка** — `scripts/install.sh`
-- **Запуск** — `./start.sh` или `./start_web.sh`
-- **Тесты** — `python3 test_nfc.py`
+- **Установка** — `./install.sh` или `./install_rpi.sh`
+- **Запуск** — `./start_web_server.sh`
+- **Тесты** — `python3 test_full.py` и `python3 test_nfc.py`
 
 ## 🔧 Использование
 
@@ -121,10 +123,10 @@ python3 personalize.py --uid ADMIN_01 --rank 9 --name "Администрато�
 
 ```bash
 # Автономная обработка карт
-sudo ./start_nfc.sh --zone 1
+sudo ./start_nfc_service.sh
 
-# С авто-регистрацией
-sudo ./start_nfc.sh --zone 1 --auto-register --rank 4
+# Диагностика подключения
+python3 diagnose_nfc.py
 ```
 
 ## 🌐 REST API
@@ -143,6 +145,15 @@ GET  /api/status      # Статус системы (real-time)
 GET  /api/nfc/status  # Проверка NFC
 POST /api/nfc/read    # Чтение UID
 POST /api/nfc/poll    # Обработка доступа
+```
+
+Ответ `/api/nfc/status`:
+```json
+{
+  "available":   true,   // модуль nfc_reader.py загружен
+  "initialized": true,   // PN532 инициализирован
+  "emulation":   false   // true = библиотека есть, но железо отсутствует
+}
 ```
 
 ## 🛠️ Развитие проекта

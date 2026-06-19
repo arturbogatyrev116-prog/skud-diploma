@@ -1,0 +1,525 @@
+{% extends "mobile_base.html" %}
+{% set active_tab = 'register' %}
+{% block title %}Регистрация{% endblock %}
+{% block header_title %}➕ Регистрация{% endblock %}
+
+{% block extra_css %}
+        .reg-main {
+            padding: 16px;
+            display: flex; flex-direction: column;
+            gap: 14px;
+        }
+
+        .uid-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 18px;
+        }
+        .uid-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.5);
+        }
+        .uid-value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 12px;
+            background: rgba(0,0,0,0.25);
+            border-radius: 8px;
+            word-break: break-all;
+            text-align: center;
+            color: #95d5b2;
+            margin-bottom: 12px;
+            min-height: 22px;
+        }
+        .uid-value.empty {
+            color: rgba(255,255,255,0.3);
+            font-style: italic;
+        }
+        .uid-source {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            text-align: center;
+        }
+
+        .scan-button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(33,150,243,0.3);
+            margin-top: 8px;
+        }
+        .scan-button:active { transform: scale(0.98); }
+        .scan-button:disabled { background: #9e9e9e; box-shadow: none; }
+
+        .uid-manual {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        .uid-manual label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            display: block;
+            margin-bottom: 6px;
+        }
+        .uid-manual input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            color: #ecf0f1;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .form-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 18px;
+        }
+        .form-field {
+            margin-bottom: 14px;
+        }
+        .form-field label {
+            display: block;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-field input,
+        .form-field select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: #ecf0f1;
+            font-size: 15px;
+        }
+        .form-field select {
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%23ecf0f1' d='M4 6l4 4 4-4z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        .rank-picker {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+        .rank-btn {
+            padding: 12px 0;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: #ecf0f1;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .rank-btn.active {
+            background: #4caf50;
+            border-color: #4caf50;
+        }
+
+        .write-tag-toggle {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            background: rgba(33,150,243,0.08);
+            border: 1px solid rgba(33,150,243,0.25);
+            border-radius: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .write-tag-toggle input { width: 20px; height: 20px; accent-color: #2196f3; }
+        .write-tag-toggle .label {
+            flex: 1;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .write-tag-toggle .sub {
+            color: rgba(255,255,255,0.5);
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .token-demo {
+            margin-top: 14px;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 10px;
+            padding: 16px;
+            display: none;
+        }
+        .token-demo h4 {
+            margin: 0 0 10px 0;
+            font-size: 11px; text-transform: uppercase;
+            letter-spacing: 1px; color: rgba(255,215,0,0.7);
+        }
+        .token-blob {
+            font-family: 'Courier New', monospace;
+            font-size: 11px; color: #ffd54f;
+            word-break: break-all;
+            background: rgba(0,0,0,0.3);
+            padding: 10px; border-radius: 6px; line-height: 1.6;
+        }
+        .token-decoded {
+            font-family: 'Courier New', monospace;
+            font-size: 12px; color: #95d5b2;
+            word-break: break-all;
+            background: rgba(0,0,0,0.3);
+            padding: 10px; border-radius: 6px; line-height: 1.7;
+            margin-top: 10px; display: none;
+        }
+        .token-inspect-btn {
+            background: transparent;
+            border: 1px solid rgba(255,215,0,0.4);
+            color: #ffd54f;
+            padding: 8px 14px;
+            border-radius: 6px; font-size: 12px;
+            cursor: pointer; margin-top: 10px; width: 100%;
+        }
+        .token-hint {
+            font-size: 10px; color: rgba(255,255,255,0.3);
+            margin-top: 8px; line-height: 1.4; text-align: center;
+        }
+{% endblock %}
+
+{% block content %}
+    <div id="permission-banner" class="m-banner" style="display:none;"></div>
+
+    <div class="reg-main">
+
+        <!-- Карта: текущий UID -->
+        <div class="uid-card">
+            <h3>UID карты</h3>
+            <div id="uid-value" class="uid-value empty">приложите карту или введите вручную</div>
+            <div id="uid-source" class="uid-source"></div>
+
+            <button id="scan-btn" class="scan-button" onclick="startScanForRegistration()">
+                📡 Сканировать карту
+            </button>
+
+            <div class="uid-manual">
+                <label>или введите UID вручную:</label>
+                <input id="uid-manual-input" type="text" placeholder="Напр. 04:BD:C5:9D или ADMIN_01" autocomplete="off" />
+            </div>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div class="form-card">
+            <div class="form-field">
+                <label>Ранг пользователя</label>
+                <div class="rank-picker" id="rank-picker">
+                    <button type="button" class="rank-btn" data-rank="3">3</button>
+                    <button type="button" class="rank-btn" data-rank="4">4</button>
+                    <button type="button" class="rank-btn active" data-rank="5">5</button>
+                    <button type="button" class="rank-btn" data-rank="6">6</button>
+                    <button type="button" class="rank-btn" data-rank="7">7</button>
+                    <button type="button" class="rank-btn" data-rank="8">8</button>
+                    <button type="button" class="rank-btn" data-rank="9">9</button>
+                </div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px;line-height:1.4;">
+                    3–4: вход/кафе • 5: офисы • 6: склад • 7: директор • 8–9: серверная
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label>Начальная зона</label>
+                <select id="zone-select">
+                    {% for zone_id, zone in zones.items() %}
+                    <option value="{{ zone_id }}"{% if zone_id == 0 %} selected{% endif %}>
+                        {{ zone.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <label class="write-tag-toggle" id="write-tag-label" style="display:none;">
+                <input type="checkbox" id="write-tag-cb" checked>
+                <div>
+                    <div class="label">🔒 Записать зашифрованный токен на чип</div>
+                    <div class="sub">Запишет AES-токен (Fernet) вместо открытых данных</div>
+                </div>
+            </label>
+
+            <button id="submit-btn" class="m-btn m-btn-primary" onclick="submitRegistration()" style="margin-top: 16px;" disabled>
+                ➕ Зарегистрировать
+            </button>
+
+            <!-- Демо-панель: показывается после регистрации -->
+            <div id="token-demo" class="token-demo">
+                <h4>🔒 Записано на NFC-чип (зашифровано)</h4>
+                <div id="token-blob" class="token-blob"></div>
+                <button id="inspect-btn" class="token-inspect-btn" onclick="inspectToken()">
+                    🔍 Расшифровать — только сервер знает ключ
+                </button>
+                <div id="token-decoded" class="token-decoded"></div>
+                <div class="token-hint">Без ключа сервера этот набор байт невозможно прочитать</div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const uidValueEl = document.getElementById('uid-value');
+const uidSourceEl = document.getElementById('uid-source');
+const uidManualInput = document.getElementById('uid-manual-input');
+const submitBtn = document.getElementById('submit-btn');
+const scanBtn = document.getElementById('scan-btn');
+const writeTagLabel = document.getElementById('write-tag-label');
+const writeTagCb = document.getElementById('write-tag-cb');
+const banner = document.getElementById('permission-banner');
+const zoneSelect = document.getElementById('zone-select');
+const rankPicker = document.getElementById('rank-picker');
+
+let currentUid = '';
+let selectedRank = 5;
+let nfcReader = null;
+let registeredToken = null;
+
+// === Ранг ===
+rankPicker.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rank-btn');
+    if (!btn) return;
+    document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedRank = parseInt(btn.dataset.rank, 10);
+});
+
+// === Установка UID ===
+function setUid(uid, source) {
+    currentUid = uid;
+    if (uid) {
+        uidValueEl.textContent = uid;
+        uidValueEl.classList.remove('empty');
+        uidSourceEl.textContent = source ? `источник: ${source}` : '';
+        submitBtn.disabled = false;
+    } else {
+        uidValueEl.textContent = 'приложите карту или введите вручную';
+        uidValueEl.classList.add('empty');
+        uidSourceEl.textContent = '';
+        submitBtn.disabled = true;
+    }
+}
+
+// === Ручной ввод ===
+uidManualInput.addEventListener('input', () => {
+    const v = uidManualInput.value.trim();
+    if (v) setUid(v, 'ручной ввод');
+    else setUid('', '');
+});
+
+// === Pre-fill UID из query string (?uid=...) если пришли со сканера ===
+(function prefillFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const queryUid = params.get('uid');
+    if (queryUid) {
+        uidManualInput.value = queryUid;
+        setUid(queryUid, 'передан со сканера');
+    }
+})();
+
+// === Web NFC чтение ===
+async function startScanForRegistration() {
+    if (!('NDEFReader' in window)) {
+        showBanner('NFC недоступен на этом устройстве. Введите UID вручную.', false);
+        return;
+    }
+    if (!window.isSecureContext) {
+        showBanner('Web NFC требует HTTPS (откройте через ngrok).', true);
+        return;
+    }
+
+    scanBtn.disabled = true;
+    scanBtn.textContent = '⏳ Запрос разрешения...';
+
+    try {
+        nfcReader = new NDEFReader();
+        await nfcReader.scan();
+        mShowToast('Приложите карту к телефону', 3000);
+        scanBtn.textContent = '📡 Ожидание карты...';
+        scanBtn.style.background = '#ff9800';
+
+        // Также показываем опцию записи на тег если NFC активен
+        writeTagLabel.style.display = 'flex';
+
+        nfcReader.onreading = (event) => {
+            const uid = (event.serialNumber || '').toString();
+            if (uid) {
+                setUid(uid, 'NFC сканирование');
+                mShowToast('Карта считана: ' + uid, 2500);
+                scanBtn.textContent = '🔁 Сканировать другую';
+                scanBtn.style.background = '#2196f3';
+                scanBtn.disabled = false;
+            }
+        };
+        nfcReader.onreadingerror = () => mShowToast('Не удалось прочитать карту');
+    } catch (err) {
+        const name = err.name || 'UnknownError';
+        let msg;
+        switch (name) {
+            case 'NotAllowedError': msg = 'Разрешение на NFC отклонено. Тапните 🔒 → разрешения → NFC.'; break;
+            case 'NotReadableError': msg = 'Включите NFC в настройках телефона.'; break;
+            case 'NotSupportedError': msg = 'Устройство не поддерживает NFC.'; break;
+            default: msg = 'Ошибка NFC: ' + (err.message || name);
+        }
+        showBanner(msg, true);
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔁 Повторить сканирование';
+        scanBtn.style.background = '#ff9800';
+    }
+}
+
+// === Отправка регистрации на сервер ===
+async function submitRegistration() {
+    if (!currentUid) { mShowToast('Нет UID'); return; }
+    const zoneId = parseInt(zoneSelect.value, 10);
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Создание...';
+
+    try {
+        const response = await fetch('/api/mobile/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({
+                uid: currentUid,
+                rank: selectedRank,
+                zone: zoneId
+            })
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            mShowToast('Ошибка: ' + (data.message || 'не удалось создать'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = '➕ Зарегистрировать';
+            return;
+        }
+
+        mShowToast('✅ Пользователь зарегистрирован', 2500);
+        registeredToken = data.token || null;
+
+        // Показать демо-панель с зашифрованным токеном
+        if (registeredToken) {
+            showTokenDemo(registeredToken);
+        }
+
+        // Записать зашифрованный токен на чип (если чекбокс включён)
+        if (writeTagCb.checked && nfcReader && registeredToken) {
+            await tryWriteToken(registeredToken);
+        }
+
+        // Сброс формы
+        setTimeout(() => {
+            uidManualInput.value = '';
+            setUid('', '');
+            submitBtn.textContent = '➕ Зарегистрировать';
+            mShowToast('Готово. Можно сканировать следующую', 2000);
+        }, 1500);
+    } catch (err) {
+        mShowToast('Сетевая ошибка');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '➕ Зарегистрировать';
+    }
+}
+
+// === Запись зашифрованного токена на чип ===
+async function tryWriteToken(token) {
+    try {
+        const writer = new NDEFReader();
+        mShowToast('Поднесите карту для записи токена...', 3500);
+        await writer.write({records: [{recordType: "text", data: token, lang: "en"}]});
+        mShowToast('🔒 Токен записан на чип', 2500);
+    } catch (err) {
+        const name = err.name || '';
+        if (name === 'NotSupportedError') {
+            mShowToast('Тег не поддерживает запись (read-only)');
+        } else if (name === 'NotAllowedError') {
+            mShowToast('Запись отклонена браузером');
+        } else {
+            mShowToast('Не удалось записать: ' + (err.message || name));
+        }
+    }
+}
+
+// === Показать демо-панель с зашифрованным токеном ===
+function showTokenDemo(token) {
+    const panel = document.getElementById('token-demo');
+    const blob = document.getElementById('token-blob');
+    const decoded = document.getElementById('token-decoded');
+    const btn = document.getElementById('inspect-btn');
+    // Показываем начало и конец токена — видно что это непонятный набор байт
+    const preview = token.substring(0, 48) + '\n...\n' + token.substring(token.length - 12);
+    blob.textContent = preview;
+    decoded.style.display = 'none';
+    decoded.textContent = '';
+    btn.disabled = false;
+    btn.textContent = '🔍 Расшифровать — только сервер знает ключ';
+    panel.style.display = 'block';
+}
+
+// === Расшифровка токена (вызывает сервер) ===
+async function inspectToken() {
+    if (!registeredToken) return;
+    const btn = document.getElementById('inspect-btn');
+    const decoded = document.getElementById('token-decoded');
+    btn.disabled = true;
+    btn.textContent = '⏳ Расшифровка на сервере...';
+    try {
+        const resp = await fetch('/api/token/inspect', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+            body: JSON.stringify({token: registeredToken})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const p = data.payload;
+            const ts = new Date(p.iat * 1000).toLocaleString('ru-RU');
+            decoded.innerHTML =
+                'uid: ' + p.uid + '<br>' +
+                'rank: ' + p.rank + '<br>' +
+                'zone: ' + p.zone + '<br>' +
+                'iat: ' + ts;
+            decoded.style.display = 'block';
+            btn.textContent = '✅ Расшифровано сервером';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '⚠️ Ошибка: ' + (data.message || 'неверный ключ');
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '⚠️ Сетевая ошибка';
+    }
+}
+
+function showBanner(text, isError) {
+    banner.textContent = text;
+    banner.className = isError ? 'm-banner error' : 'm-banner';
+    banner.style.display = 'block';
+}
+</script>
+{% endblock %}
